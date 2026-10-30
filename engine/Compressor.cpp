@@ -16,7 +16,7 @@ void Compressor::prepare(double rate,const Parameters& initial) noexcept {
     fs=std::isfinite(rate) ? std::clamp(rate,8000.0,384000.0) : 48000;
     rampLength=std::max(1,static_cast<int>(fs*0.005));
     meterPeriod=std::max(1,static_cast<int>(fs*0.01));
-    hpState={}; lpState={}; rms={}; envelope={}; holdRemaining={}; meter={}; meterCount=0;
+    hpState={}; lpState={}; rms={}; envelope={}; smoothEnvelope={}; previousGain={1.0f,1.0f}; holdRemaining={}; meter={}; meterCount=0;
     rmsCoeff=static_cast<float>(std::exp(-1.0/(0.01*fs)));
     p=initial; p.sanitize();
     for(std::size_t i=0;i<Count;++i) smooth[i].reset(rampTarget(i,p[i],fs));
@@ -47,12 +47,17 @@ void Compressor::process(float* const* audio,int channels,int samples,const floa
         for(std::size_t i=0;i<Count;++i) v[i]=smooth[i].next();
         const float inputGain=v[Input],makeupGain=v[Makeup];
         const float hpCoeff=v[Highpass],lpCoeff=v[Lowpass];
+        // Clean feedforward; Feedback senses prior actual attenuation;
+        // Smooth cascades the envelope. 5-ms ramps interpolate models.
+        const float feedbackWeight=std::clamp(std::min(v[Style],2.0f-v[Style]),0.0f,1.0f);
+        const float smoothWeight=std::clamp(v[Style]-1.0f,0.0f,1.0f);
         const float hpWet=filterWet[0].next(),lpWet=filterWet[1].next();
         float original[2]{},dry[2]{},detected[2]{},listen[2]{};
         for(int c=0;c<channels;++c) {
             original[c]=clean(audio[c][n]); dry[c]=original[c]*inputGain;
             const float side=(sc && scChannels>0) ? clean(sc[std::min(c,scChannels-1)][n]) : 0.0f;
-            float x=dry[c]+(side-dry[c])*v[External];
+            const float internal=dry[c]*(1.0f-feedbackWeight*(1.0f-previousGain[c]));
+            float x=internal+(side-internal)*v[External];
             hpState[c]=flush(hpCoeff*hpState[c]+(1-hpCoeff)*x);
             x-=hpWet*hpState[c];
             lpState[c]=flush(lpCoeff*lpState[c]+(1-lpCoeff)*x);
@@ -75,14 +80,22 @@ void Compressor::process(float* const* audio,int channels,int samples,const floa
                 env=target+coeff*(env-target);
             }
             env=flush(env);
-            const float wet=dry[c]*dbToGain(-env)*makeupGain;
+            // Distinct cascaded reduction pole, active only in Smooth mode.
+            if(smoothWeight>0.0f) {
+                const float coeff=env>smoothEnvelope[c] ? attackCoeff : releaseCoeff;
+                smoothEnvelope[c]=flush(env+coeff*(smoothEnvelope[c]-env));
+            } else smoothEnvelope[c]=env;
+            const float effectiveEnv=env+(smoothEnvelope[c]-env)*smoothWeight;
+            const float attenuation=dbToGain(-effectiveEnv);
+            previousGain[c]=attenuation;
+            const float wet=dry[c]*attenuation*makeupGain;
             float out=dry[c]+(wet-dry[c])*(v[Mix]*0.01f);
             out+=(listen[c]-out)*v[Listen];
             out=v[Bypass]>=1.0f ? original[c] : out+(original[c]-out)*v[Bypass];
             audio[c][n]=out;
             meter.input=std::max(meter.input,std::abs(dry[c]));
             meter.output=std::max(meter.output,std::abs(out));
-            meter.reduction=std::max(meter.reduction,env*(1-v[Bypass]));
+            meter.reduction=std::max(meter.reduction,effectiveEnv*(1-v[Bypass]));
         }
         if(++meterCount>=meterPeriod) {
             if(meters) meters->push(meter);

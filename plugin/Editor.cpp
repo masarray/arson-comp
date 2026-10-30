@@ -1,6 +1,6 @@
 #include "Editor.h"
 namespace {
-const juce::Colour bg{0xff171a1f},panel{0xff101318},line{0xff303740},text{0xffd4dbe1},muted{0xff89939f},cyan{0xff59c9dc},gold{0xffe4b65e};
+const juce::Colour bg{0xff11151b},panel{0xff161c24},line{0xff303b49},text{0xffe4eaf2},muted{0xff9aa7b8},cyan{0xff4edbd4},gold{0xffffc270};
 }
 CompLook::CompLook() {
     setColour(juce::Slider::textBoxTextColourId,text);
@@ -27,17 +27,30 @@ juce::Label* CompLook::createSliderTextBox(juce::Slider& slider) {
     return label;
 }
 void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,float pos,float start,float end,juce::Slider&) {
-    const auto bounds=juce::Rectangle<float>(static_cast<float>(x),static_cast<float>(y),static_cast<float>(w),static_cast<float>(h)).reduced(6);
-    const float r=std::min(bounds.getWidth(),bounds.getHeight())*0.5f,cx=bounds.getCentreX(),cy=bounds.getCentreY();
+    const auto bounds=juce::Rectangle<float>(static_cast<float>(x),static_cast<float>(y),
+        static_cast<float>(w),static_cast<float>(h)).reduced(9.0f);
+    const float r=std::min(bounds.getWidth(),bounds.getHeight())*0.5f;
+    const float cx=bounds.getCentreX(),cy=bounds.getCentreY();
+    g.setColour(juce::Colour{0xff202a35});
+    g.fillEllipse(cx-r+3,cy-r+3,2*r-6,2*r-6);
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff3a4652},cx-r,cy-r,
+        juce::Colour{0xff121820},cx+r,cy+r,false));
+    g.fillEllipse(cx-r+7,cy-r+7,2*r-14,2*r-14);
     juce::Path track,active;
     track.addCentredArc(cx,cy,r,r,0,start,end,true);
     active.addCentredArc(cx,cy,r,r,0,start,start+pos*(end-start),true);
-    g.setColour(line); g.strokePath(track,juce::PathStrokeType(2.5f));
-    g.setColour(cyan); g.strokePath(active,juce::PathStrokeType(2.5f));
-    g.setColour(juce::Colour{0xff262d35}); g.fillEllipse(cx-r+5,cy-r+5,2*r-10,2*r-10);
-    const float a=start+pos*(end-start);
-    g.setColour(text); g.drawLine(cx+std::sin(a)*(r*0.45f),cy-std::cos(a)*(r*0.45f),cx+std::sin(a)*(r*0.75f),cy-std::cos(a)*(r*0.75f),2);
+    g.setColour(juce::Colour{0xff485361});
+    g.strokePath(track,juce::PathStrokeType(3.2f));
+    g.setColour(gold);
+    g.strokePath(active,juce::PathStrokeType(3.2f));
+    const float angle=start+pos*(end-start);
+    g.setColour(text);
+    g.drawLine(cx+std::sin(angle)*r*0.35f,cy-std::cos(angle)*r*0.35f,
+               cx+std::sin(angle)*r*0.73f,cy-std::cos(angle)*r*0.73f,2.1f);
+    g.setColour(juce::Colour{0xff8c9bac});
+    g.fillEllipse(cx-1.6f,cy-1.6f,3.2f,3.2f);
 }
+
 Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.snapshot()) {
     setLookAndFeel(&look); setOpaque(true);
     for(std::size_t i=0;i<knobs.size();++i) {
@@ -53,6 +66,10 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         addAndMakeVisible(labels[i]);
         attachments[i]=std::make_unique<SliderAttachment>(p.state,s.id,k);
     }
+    style.addItemList({"Clean - feedforward","Feedback - classic","Smooth - dual envelope"},1);
+    style.setTooltip("Genuinely different DSP models: causal feed-forward, feedback, and dual-envelope.");
+    addAndMakeVisible(style);
+    styleAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(p.state,"style",style);
     presets.addItemList({"Default","Vocal | gentle","Vocal | level","Mix bus | glue","Drums | punch","Podcast | steady"},1);
     presets.setSelectedId(1,juce::dontSendNotification); presets.onChange=[this]{applyPreset(presets.getSelectedId());};
     presets.setTooltip("Factory starting points. Adjust threshold to your input level."); addAndMakeVisible(presets);
@@ -69,7 +86,7 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     addAndMakeVisible(compare);
     arson::MeterFrame discard; for(std::uint32_t i=0;i<arson::MeterQueue::capacity && p.meters.pop(discard);++i) {} // discard closed-editor backlog
     presets.setSelectedId(0,juce::dontSendNotification); presets.setText("Custom / restored",juce::dontSendNotification);
-    setResizable(true,true); setResizeLimits(860,570,1280,820); setSize(960,600); startTimerHz(30);
+    setResizable(true,true); setResizeLimits(920,620,1320,840); setSize(1040,680); startTimerHz(30);
 }
 Editor::~Editor() { stopTimer(); setLookAndFeel(nullptr); }
 void Editor::setValue(std::size_t i,float value) {
@@ -80,40 +97,62 @@ void Editor::setValue(std::size_t i,float value) {
 void Editor::applyPreset(int id) {
     if(id<1) return;
     arson::Parameters p;
-    if(id==2) { p.value[arson::Ratio]=2.5f;p.value[arson::Attack]=15;p.value[arson::Release]=180;p.value[arson::Knee]=12; }
-    if(id==3) { p.value[arson::Threshold]=-24;p.value[arson::Ratio]=3;p.value[arson::Detector]=1;p.value[arson::AutoRelease]=1;p.value[arson::Highpass]=100; }
-    if(id==4) { p.value[arson::Ratio]=2;p.value[arson::Attack]=30;p.value[arson::Release]=250;p.value[arson::Knee]=12;p.value[arson::Range]=6;p.value[arson::Highpass]=80; }
+    if(id==2) { p.value[arson::Ratio]=2.5f;p.value[arson::Attack]=15;p.value[arson::Release]=180;p.value[arson::Knee]=12;p.value[arson::Style]=2; }
+    if(id==3) { p.value[arson::Threshold]=-24;p.value[arson::Ratio]=3;p.value[arson::Detector]=1;p.value[arson::AutoRelease]=1;p.value[arson::Highpass]=100;p.value[arson::Style]=1; }
+    if(id==4) { p.value[arson::Ratio]=2;p.value[arson::Attack]=30;p.value[arson::Release]=250;p.value[arson::Knee]=12;p.value[arson::Range]=6;p.value[arson::Highpass]=80;p.value[arson::Style]=2; }
     if(id==5) { p.value[arson::Ratio]=5;p.value[arson::Attack]=25;p.value[arson::Release]=80;p.value[arson::Knee]=3;p.value[arson::Mix]=75; }
-    if(id==6) { p.value[arson::Threshold]=-24;p.value[arson::Ratio]=4;p.value[arson::Attack]=5;p.value[arson::Release]=180;p.value[arson::Knee]=12;p.value[arson::Highpass]=100;p.value[arson::AutoRelease]=1; }
+    if(id==6) { p.value[arson::Threshold]=-24;p.value[arson::Ratio]=4;p.value[arson::Attack]=5;p.value[arson::Release]=180;p.value[arson::Knee]=12;p.value[arson::Highpass]=100;p.value[arson::AutoRelease]=1;p.value[arson::Style]=2; }
     presetSnapshot=p;
     for(std::size_t i=0;i<arson::Count;++i) if(i!=arson::External && i!=arson::Listen && i!=arson::Bypass) setValue(i,p[i]);
 }
 void Editor::resized() {
-    presets.setBounds(getWidth()-420,16,210,27); compare.setBounds(getWidth()-198,16,64,27); bypass.setBounds(getWidth()-122,16,100,27);
-    display={20,64,getWidth()-40,getHeight()-318};
-    const int y=display.getBottom()+20, width=(getWidth()-40)/8;
-    const std::array<std::size_t,8> primary{arson::Threshold,arson::Ratio,arson::Attack,arson::Release,arson::Knee,arson::Range,arson::Makeup,arson::Mix};
+    const int w=getWidth(),h=getHeight();
+    style.setBounds(270,25,154,29);
+    presets.setBounds(w-426,25,200,29);
+    compare.setBounds(w-213,25,69,29);
+    bypass.setBounds(w-135,25,113,29);
+    display={18,66,w-36,h-326};
+    const int y=display.getBottom()+14,knobWidth=(w-40)/8;
+    const std::array<std::size_t,8> primary{arson::Threshold,arson::Ratio,arson::Attack,
+        arson::Release,arson::Knee,arson::Range,arson::Makeup,arson::Mix};
     for(std::size_t j=0;j<primary.size();++j) {
-        const auto i=primary[j]; const int x=20+static_cast<int>(j)*width;
-        labels[i].setBounds(x,y,width,18); knobs[i].setBounds(x+6,y+18,width-12,88);
+        const auto i=primary[j];const int x=20+static_cast<int>(j)*knobWidth;
+        labels[i].setBounds(x,y,knobWidth,18);
+        knobs[i].setBounds(x+5,y+17,knobWidth-10,89);
     }
-    const int bottom=y+121, small=(getWidth()-300)/5;
-    const std::array<std::size_t,5> secondary{arson::Input,arson::Hold,arson::Link,arson::Highpass,arson::Lowpass};
+    const int bottom=y+118,small=(w-300)/5;
+    const std::array<std::size_t,5> secondary{arson::Input,arson::Hold,arson::Link,
+        arson::Highpass,arson::Lowpass};
     for(std::size_t j=0;j<secondary.size();++j) {
-        const auto i=secondary[j]; const int x=20+static_cast<int>(j)*small;
-        labels[i].setBounds(x,bottom,small,16); knobs[i].setBounds(x+12,bottom+16,small-24,72);
+        const auto i=secondary[j];const int x=20+static_cast<int>(j)*small;
+        labels[i].setBounds(x,bottom,small,18);
+        knobs[i].setBounds(x+7,bottom+17,small-14,77);
     }
-    const int x=getWidth()-260;
-    detector.setBounds(x,bottom+5,98,25); autoRelease.setBounds(x+106,bottom+5,130,25);
-    external.setBounds(x,bottom+41,120,25); listen.setBounds(x+126,bottom+41,110,25);
+    const int x=w-272;
+    detector.setBounds(x,bottom+7,103,26);
+    autoRelease.setBounds(x+110,bottom+7,146,26);
+    external.setBounds(x,bottom+43,125,26);
+    listen.setBounds(x+135,bottom+43,120,26);
     grid=juce::Image(juce::Image::RGB,display.getWidth(),display.getHeight(),true);
-    juce::Graphics g(grid); g.fillAll(panel); g.setFont(juce::FontOptions(11));
+    juce::Graphics g(grid);
+    g.fillAll(panel);
+    const int graphLeft=290,graphRight=display.getWidth()-132;
+    const float top=32.0f,bottomY=static_cast<float>(display.getHeight()-35);
     for(int db=0;db>=-60;db-=12) {
-        const float yy=26+static_cast<float>(-db)/60*(display.getHeight()-52);
-        g.setColour(line.withAlpha(0.55f)); g.drawHorizontalLine(static_cast<int>(yy),200.0f,static_cast<float>(display.getWidth()-140));
-        g.setColour(muted);g.drawText(juce::String(db),display.getWidth()-140,static_cast<int>(yy)-7,28,14,juce::Justification::centredRight);
+        const float yy=bottomY-static_cast<float>(db+60)/60.0f*(bottomY-top);
+        g.setColour(line.withAlpha(0.50f));
+        g.drawHorizontalLine(static_cast<int>(yy),static_cast<float>(graphLeft),static_cast<float>(graphRight));
+        g.setColour(muted.withAlpha(0.65f));g.setFont(juce::FontOptions(10));
+        g.drawText(juce::String(db),graphRight+3,static_cast<int>(yy)-8,23,16,juce::Justification::centred);
     }
+    for(int i=1;i<8;++i) {
+        const float xx=static_cast<float>(graphLeft)+(graphRight-graphLeft)*i/8.0f;
+        g.setColour(line.withAlpha(0.32f));g.drawVerticalLine(static_cast<int>(xx),top,bottomY);
+    }
+    g.setColour(line);g.drawVerticalLine(272,16.0f,static_cast<float>(display.getHeight()-16));
+    g.drawVerticalLine(display.getWidth()-124,16.0f,static_cast<float>(display.getHeight()-16));
 }
+
 void Editor::timerCallback() {
     if(!isShowing()) return;
     if(presets.getSelectedId()>0) {
@@ -132,57 +171,119 @@ void Editor::timerCallback() {
     repaint(display);
 }
 void Editor::paint(juce::Graphics& g) {
-    g.fillAll(bg);g.setColour(text);g.setFont(juce::FontOptions(19));g.drawText("ArSonComp",22,16,170,27,juce::Justification::centredLeft);
-    g.setColour(muted);g.setFont(juce::FontOptions(11));g.drawText("LIVE COMPRESSOR",170,18,150,24,juce::Justification::centredLeft);
-    g.drawImageAt(grid,display.getX(),display.getY());drawDisplay(g);
-    g.setColour(line);g.drawHorizontalLine(display.getBottom()+133,20.0f,static_cast<float>(getWidth()-20));
-    g.setColour(muted);g.setFont(juce::FontOptions(11));g.drawText("0 samples latency  |  No lookahead  |  Native processing",22,getHeight()-25,400,18,juce::Justification::centredLeft);
-    g.drawText("Double-click to reset  /  Click value to type",getWidth()-310,getHeight()-25,288,18,juce::Justification::centredRight);
+    g.fillAll(bg);
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff212a35},0.0f,0.0f,bg,0.0f,64.0f,false));
+    g.fillRect(0,0,getWidth(),65);
+    g.setColour(text);g.setFont(juce::FontOptions(21));
+    g.drawText("ArSonComp",21,13,190,29,juce::Justification::centredLeft);
+    g.setColour(gold);g.fillRoundedRectangle(23.0f,48.0f,53.0f,2.0f,1.0f);
+    g.setColour(muted);g.setFont(juce::FontOptions(10));
+    g.drawText("LIVE DYNAMICS",88,44,145,14,juce::Justification::centredLeft);
+    g.drawText("MODEL",271,8,146,15,juce::Justification::left);
+    g.drawText("FACTORY PRESET",getWidth()-425,8,194,15,juce::Justification::left);
+    if(grid.isValid())g.drawImageAt(grid,display.getX(),display.getY());
+    g.setColour(line);g.drawRoundedRectangle(display.toFloat(),6.0f,1.0f);
+    drawDisplay(g);
+    g.setColour(line.withAlpha(0.75f));
+    g.drawHorizontalLine(display.getBottom()+123,20.0f,static_cast<float>(getWidth()-20));
+    g.setColour(muted);g.setFont(juce::FontOptions(10.5f));
+    g.drawText("0 SAMPLES ADDED   |   REAL-TIME DSP   |   VST3",20,getHeight()-25,455,17,juce::Justification::left);
+    g.drawText("Drag controls  /  double-click reset  /  type exact values",
+        getWidth()-420,getHeight()-25,400,17,juce::Justification::centredRight);
 }
+
 void Editor::drawDisplay(juce::Graphics& g) {
-    juce::Graphics::ScopedSaveState save(g);g.reduceClipRegion(display);g.setOrigin(display.getPosition());
-    const float h=static_cast<float>(display.getHeight()),w=static_cast<float>(display.getWidth());
+    juce::Graphics::ScopedSaveState save(g);
+    g.reduceClipRegion(display);
+    g.setOrigin(display.getPosition());
+    const float h=static_cast<float>(display.getHeight());
+    const float w=static_cast<float>(display.getWidth());
     const auto p=processor.snapshot();
-    g.setFont(juce::FontOptions(11));g.setColour(muted);g.drawText("TRANSFER",16,10,150,18,juce::Justification::centredLeft);
-    const juce::Rectangle<float> curve{18,42,154,h-78};
-    const auto cy=[&](float db){return curve.getBottom()-juce::jlimit(0.0f,1.0f,(db+60)/60)*curve.getHeight();};
-    g.setColour(line);g.drawRect(curve);g.drawLine(curve.getX(),curve.getBottom(),curve.getRight(),curve.getY());
+    const float top=32.0f,bottom=h-35.0f;
+    g.setFont(juce::FontOptions(11.0f));
+    g.setColour(muted);g.drawText("COMPRESSION CURVE",23,10,235,18,juce::Justification::left);
+    g.drawText("DYNAMICS  |  4s",291,10,230,18,juce::Justification::left);
+
+    const juce::Rectangle<float> curve{26.0f,top,229.0f,bottom-top};
+    const auto yCurve=[&](float db) {
+        return curve.getBottom()-juce::jlimit(0.0f,1.0f,(db+60.0f)/60.0f)*curve.getHeight();
+    };
+    g.setColour(line.withAlpha(0.75f));g.drawRect(curve,1.0f);
+    g.setColour(muted.withAlpha(0.30f));
+    g.drawLine(curve.getX(),curve.getBottom(),curve.getRight(),curve.getY(),1.0f);
+    const float tx=curve.getX()+juce::jlimit(0.0f,1.0f,(p[arson::Threshold]+60)/60.0f)*curve.getWidth();
+    g.setColour(gold.withAlpha(0.30f));g.drawVerticalLine(static_cast<int>(tx),top,bottom);
     juce::Path transfer;
-    for(int i=0;i<=154;++i) {
-        const float db=-60+60.0f*i/154,red=arson::reduction(db,p[arson::Threshold],p[arson::Ratio],p[arson::Knee],p[arson::Range]);
-        const float yy=cy(db-red);if(i==0)transfer.startNewSubPath(curve.getX()+i,yy);else transfer.lineTo(curve.getX()+i,yy);
+    for(int i=0;i<=229;++i) {
+        const float db=-60.0f+60.0f*i/229.0f;
+        const float gain=arson::reduction(db,p[arson::Threshold],p[arson::Ratio],p[arson::Knee],p[arson::Range]);
+        const float yy=yCurve(db-gain);
+        if(i==0)transfer.startNewSubPath(curve.getX(),yy);
+        else transfer.lineTo(curve.getX()+i,yy);
     }
-    g.setColour(gold);g.strokePath(transfer,juce::PathStrokeType(2));
+    g.setColour(gold.withAlpha(0.18f));g.strokePath(transfer,juce::PathStrokeType(5.0f));
+    g.setColour(gold);g.strokePath(transfer,juce::PathStrokeType(1.9f));
     const float dotX=curve.getX()+juce::jlimit(0.0f,1.0f,(inputDb+60)/60)*curve.getWidth();
-    const float dotY=cy(inputDb-arson::reduction(inputDb,p[arson::Threshold],p[arson::Ratio],p[arson::Knee],p[arson::Range]));
-    g.fillEllipse(dotX-3,dotY-3,6,6);
-    g.setColour(muted);g.drawText("-60            Input dB             0",14,static_cast<int>(h)-28,168,18,juce::Justification::centred);
-    const float left=200,right=w-148,top=26,bottom=h-26;
-    const auto y=[&](float level){return bottom-juce::jlimit(0.0f,1.0f,(level+60)/60)*(bottom-top);};
-    juce::Path input,output,reduction;
+    const float dotY=yCurve(inputDb-arson::reduction(inputDb,p[arson::Threshold],
+        p[arson::Ratio],p[arson::Knee],p[arson::Range]));
+    g.setColour(gold.withAlpha(0.25f));g.fillEllipse(dotX-6,dotY-6,12,12);
+    g.setColour(juce::Colours::white);g.fillEllipse(dotX-2.2f,dotY-2.2f,4.4f,4.4f);
+    g.setColour(muted);g.setFont(juce::FontOptions(10.0f));
+    g.drawText("-60 dB",24,static_cast<int>(h)-29,65,17,juce::Justification::left);
+    g.drawText("0 dB",190,static_cast<int>(h)-29,65,17,juce::Justification::right);
+
+    // GUI drains a fixed 400-frame telemetry history; no audio-thread graphics.
+    const float left=290,right=w-132;
+    const auto levelY=[&](float db) {
+        return bottom-juce::jlimit(0.0f,1.0f,(db+60.0f)/60.0f)*(bottom-top);
+    };
+    juce::Path inPath,outPath,grPath,grFill;
     for(std::size_t i=0;i<history.size();++i) {
-        const auto& f=history[(head+i)%history.size()];const float x=left+(right-left)*static_cast<float>(i)/(history.size()-1);
-        const float a=y(arson::gainToDb(f.input)),b=y(arson::gainToDb(f.output)),c=top+std::min(f.reduction/36.0f,1.0f)*(bottom-top);
-        if(i==0) { input.startNewSubPath(x,a);output.startNewSubPath(x,b);reduction.startNewSubPath(x,c); }
-        else { input.lineTo(x,a);output.lineTo(x,b);reduction.lineTo(x,c); }
+        const auto& f=history[(head+i)%history.size()];
+        const float xx=left+(right-left)*static_cast<float>(i)/(history.size()-1);
+        const float iy=levelY(arson::gainToDb(f.input));
+        const float oy=levelY(arson::gainToDb(f.output));
+        const float ry=top+juce::jlimit(0.0f,1.0f,f.reduction/36.0f)*(bottom-top);
+        if(i==0) {
+            inPath.startNewSubPath(xx,iy);outPath.startNewSubPath(xx,oy);
+            grPath.startNewSubPath(xx,ry);
+            grFill.startNewSubPath(xx,top);grFill.lineTo(xx,ry);
+        } else {
+            inPath.lineTo(xx,iy);outPath.lineTo(xx,oy);
+            grPath.lineTo(xx,ry);grFill.lineTo(xx,ry);
+        }
     }
-    g.setColour(muted.withAlpha(0.5f));g.strokePath(input,juce::PathStrokeType(1));
-    g.setColour(cyan);g.strokePath(output,juce::PathStrokeType(1.4f));
-    g.setColour(gold);g.strokePath(reduction,juce::PathStrokeType(1.5f));
-    g.setColour(gold.withAlpha(0.35f));g.drawHorizontalLine(static_cast<int>(y(p[arson::Threshold])),left,right);
-    g.setColour(muted);g.drawText("IN",202,5,30,18,juce::Justification::left);g.setColour(cyan);g.drawText("OUT",238,5,40,18,juce::Justification::left);
-    g.setColour(gold);g.drawText("GR  0-36 dB",285,5,110,18,juce::Justification::left);
+    grFill.lineTo(right,top);grFill.closeSubPath();
+    g.setGradientFill(juce::ColourGradient(gold.withAlpha(0.16f),left,top,
+        gold.withAlpha(0.0f),left,bottom,false));
+    g.fillPath(grFill);
+    g.setColour(muted.withAlpha(0.48f));g.strokePath(inPath,juce::PathStrokeType(1.05f));
+    g.setColour(cyan.withAlpha(0.93f));g.strokePath(outPath,juce::PathStrokeType(1.55f));
+    g.setColour(gold);g.strokePath(grPath,juce::PathStrokeType(1.55f));
+    g.setColour(gold.withAlpha(0.33f));
+    g.drawHorizontalLine(static_cast<int>(levelY(p[arson::Threshold])),left,right);
+    g.setFont(juce::FontOptions(10.5f));
+    g.setColour(muted);g.drawText("IN",static_cast<int>(left),static_cast<int>(h)-28,36,17,juce::Justification::left);
+    g.setColour(cyan);g.drawText("OUT",static_cast<int>(left)+38,static_cast<int>(h)-28,48,17,juce::Justification::left);
+    g.setColour(gold);g.drawText("GR",static_cast<int>(left)+93,static_cast<int>(h)-28,38,17,juce::Justification::left);
     const float values[]{inputDb,gr,outputDb};const char* names[]{"IN","GR","OUT"};
     for(int i=0;i<3;++i) {
-        const int x=static_cast<int>(w)-106+i*35;
-        g.setColour(muted);g.drawText(names[i],x-4,8,34,18,juce::Justification::centred);
-        g.setColour(line);g.fillRect(static_cast<float>(x+7),36.0f,9.0f,h-76);
-        const float amount=i==1 ? juce::jlimit(0.0f,1.0f,values[i]/36) : juce::jlimit(0.0f,1.0f,(values[i]+60)/60);
-        const float bar=(h-76)*amount;g.setColour(i==1 ? gold : cyan);
-        g.fillRect(static_cast<float>(x+7),i==1 ? 36.0f : h-40-bar,9.0f,bar);
-        g.setColour(text);g.drawText(values[i]<-99 ? "-inf" : juce::String(values[i],1),x-8,static_cast<int>(h)-30,42,18,juce::Justification::centred);
+        const float x=w-116.0f+static_cast<float>(i)*37.0f;
+        g.setColour(muted);g.drawText(names[i],static_cast<int>(x)-3,8,31,18,juce::Justification::centred);
+        g.setColour(juce::Colour{0xff26313c});g.fillRoundedRectangle(x+7,top,10,bottom-top,3);
+        const float fraction=i==1 ? juce::jlimit(0.0f,1.0f,values[i]/36.0f)
+            : juce::jlimit(0.0f,1.0f,(values[i]+60.0f)/60.0f);
+        const float filled=(bottom-top)*fraction;
+        g.setColour(i==1 ? gold : cyan);
+        if(filled>0)g.fillRoundedRectangle(x+7,(i==1 ? top : bottom-filled),10,filled,3.0f);
+        g.setColour(text);g.setFont(juce::FontOptions(10.0f));
+        g.drawText(values[i]<-99 ? "-inf" : juce::String(values[i],1),
+            static_cast<int>(x)-6,static_cast<int>(h)-29,39,18,juce::Justification::centred);
     }
     if(p[arson::Listen]>0.5f || p[arson::Bypass]>0.5f) {
-        g.setColour(gold);g.drawText(p[arson::Bypass]>0.5f ? "BYPASSED" : "SIDECHAIN LISTEN",static_cast<int>(left),static_cast<int>(h)-23,250,18,juce::Justification::left);
+        g.setColour(gold);g.setFont(juce::FontOptions(11.0f));
+        g.drawText(p[arson::Bypass]>0.5f ? "BYPASSED" : "SIDECHAIN MONITOR",
+            static_cast<int>(left)+125,8,210,18,juce::Justification::left);
     }
 }
+

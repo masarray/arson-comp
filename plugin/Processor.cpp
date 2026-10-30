@@ -4,7 +4,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout Processor::layout() {
     juce::AudioProcessorValueTreeState::ParameterLayout result;
     for(std::size_t i=0;i<arson::Count;++i) {
         const auto& s=arson::specs[i]; const juce::ParameterID id{s.id,1};
-        if(i==arson::Detector) result.add(std::make_unique<juce::AudioParameterChoice>(id,s.name,juce::StringArray{"Peak","RMS"},0));
+        if(i==arson::Style) result.add(std::make_unique<juce::AudioParameterChoice>(id,s.name,juce::StringArray{"Clean","Feedback","Smooth"},0));
+        else if(i==arson::Detector) result.add(std::make_unique<juce::AudioParameterChoice>(id,s.name,juce::StringArray{"Peak","RMS"},0));
         else if(i>arson::Detector) result.add(std::make_unique<juce::AudioParameterBool>(id,s.name,s.initial>0.5f));
         else result.add(std::make_unique<juce::AudioParameterFloat>(id,s.name,
             juce::NormalisableRange<float>{s.min,s.max,0.0f,s.skew},s.initial,

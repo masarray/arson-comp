@@ -6,7 +6,7 @@
 
 namespace arson {
 enum Param : std::size_t { Threshold, Ratio, Attack, Release, Knee, Range, Hold,
-    Makeup, Mix, Input, Link, Highpass, Lowpass, Detector, AutoRelease, External, Listen, Bypass, Count };
+    Makeup, Mix, Input, Link, Highpass, Lowpass, Detector, AutoRelease, External, Listen, Bypass, Style, Count };
 struct Spec { const char* id; const char* name; const char* unit; float min, max, initial, skew; };
 inline constexpr std::array<Spec, Count> specs {{
     {"threshold", "Threshold", " dB", -60, 0, -18, 1},
@@ -26,7 +26,8 @@ inline constexpr std::array<Spec, Count> specs {{
     {"autoRelease", "Auto release", "", 0, 1, 0, 1},
     {"external", "External SC", "", 0, 1, 0, 1},
     {"listen", "SC listen", "", 0, 1, 0, 1},
-    {"bypass", "Bypass", "", 0, 1, 0, 1}
+    {"bypass", "Bypass", "", 0, 1, 0, 1},
+    {"style", "Compression model", "", 0, 2, 0, 1}
 }};
 struct Parameters {
     std::array<float, Count> value{};

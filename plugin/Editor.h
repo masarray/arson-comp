@@ -26,11 +26,11 @@ private:
     using SliderAttachment=juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment=juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::array<std::unique_ptr<SliderAttachment>,arson::Detector> attachments;
-    juce::ComboBox presets,detector;
+    juce::ComboBox presets,detector,style;
     juce::TextButton compare{"A / B"};
     juce::ToggleButton autoRelease{"Auto release"},external{"External SC"},listen{"Listen SC"},bypass{"Bypass"};
     std::array<std::unique_ptr<ButtonAttachment>,4> buttons;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> detectorAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> detectorAttachment,styleAttachment;
     arson::Parameters alternate, presetSnapshot;
     bool alternateActive=false;
     std::array<arson::MeterFrame,400> history{};

@@ -2,15 +2,15 @@
 
 A compact live compressor: framework-independent C++17 DSP, JUCE VST3 and standalone, zero added algorithmic latency. The interface prioritizes transfer curve, input/output history and gain reduction, with familiar compressor controls and an original ArSon visual identity.
 
-**Status: initial engineering test build, not claimed to match FabFilter's proprietary algorithms or sound.**
+**Status: engineering test build with three original compression models and a redesigned graphical interface, not claimed to match FabFilter's proprietary algorithms or sound.**
 
 ## Implemented
 
-- Peak and 10 ms RMS detection, threshold, ratio, continuously joined soft knee, range, attack, hold and release.
+- Three causal models: Clean feed-forward, Feedback topology, and Smooth dual-envelope response. Peak and 10 ms RMS detection, threshold, ratio, continuously joined soft knee, range, attack, hold and release.
 - Optional envelope-dependent auto release; stereo link from independent channels to maximum-linked detection.
 - Internal/external mono/stereo sidechain, high-pass/low-pass detector filters and listen.
 - Input/makeup gain, dry/wet parallel compression, smoothed bypass, six factory starting points and A/B comparison.
-- Stable automation IDs and versioned state recall. Mono and stereo layouts.
+- Stable automation IDs and versioned state recall. New model `style` appended without renaming previous parameters. Mono and stereo layouts.
 - Separate engine without JUCE, locks, heap allocation, I/O, worker dependencies or delay lines in processing.
 - Bounded SPSC telemetry at 100 Hz; editor coalesces updates at 30 Hz, caches static grid, and repaints only the display during metering.
 

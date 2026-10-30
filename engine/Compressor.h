@@ -25,7 +25,7 @@ private:
     std::array<Ramp,Count> smooth{};
     // Filter on/off is blended separately from cutoff coefficients to avoid endpoint steps.
     std::array<Ramp,2> filterWet{};
-    std::array<float,2> hpState{}, lpState{}, rms{}, envelope{};
+    std::array<float,2> hpState{}, lpState{}, rms{}, envelope{}, smoothEnvelope{}, previousGain{1.0f,1.0f};
     std::array<int,2> holdRemaining{};
     double fs=48000;
     float attackCoeff=0,releaseCoeff=0,slowReleaseCoeff=0,rmsCoeff=0;

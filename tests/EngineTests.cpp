@@ -104,6 +104,32 @@ int main() {
         require(near(audio.back(),-0.25f,0.001f),"sidechain source reaches requested signal after ramp");
     }
     {
+        // Three model topologies must produce measurably different transients.
+        const auto sampleAt=[](int model,int length) {
+            Parameters p;p.value[Style]=static_cast<float>(model);
+            p.value[Threshold]=-24;p.value[Ratio]=8;p.value[Attack]=10;
+            p.value[Release]=250;p.value[Knee]=0;
+            Compressor c;c.prepare(48000,p);
+            std::vector<float> a(static_cast<std::size_t>(length),1.0f);
+            float* ptr[]{a.data()};c.process(ptr,1,length);return a.back();
+        };
+        const float clean=sampleAt(0,480),feedback=sampleAt(1,480),smooth=sampleAt(2,480);
+        require(feedback>clean+0.02f,"feedback differs from feedforward");
+        require(smooth>clean+0.02f,"dual-pole differs from feedforward");
+        for(float model : {0.0f,1.0f,2.0f}) {
+            Parameters p;p.value[Style]=model;p.value[Threshold]=-25;
+            Compressor a,b;a.prepare(48000,p);b.prepare(48000,p);
+            std::vector<float> whole(4096),split(4096);
+            for(int i=0;i<4096;++i)whole[i]=split[i]=0.7f*std::sin(i*0.14f);
+            float* one[]{whole.data()};a.process(one,1,4096);
+            for(int offset=0;offset<4096;) {
+                const int n=std::min(43,4096-offset);
+                float* part[]{split.data()+offset};b.process(part,1,n);offset+=n;
+            }
+            require(whole==split,"style block partition invariance");
+        }
+    }
+    {
         Compressor c;Parameters p;for(auto& v:p.value)v=std::numeric_limits<float>::quiet_NaN();c.prepare(0,p);
         float a[]{std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN(),1e-38f,1};float* ptr[]{a};c.process(ptr,1,4);
         for(auto v:a)require(std::isfinite(v),"invalid input contained");

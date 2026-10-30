@@ -9,8 +9,12 @@ int main(int argc,char** argv) {
     if(parameter->getText(parameter->convertTo0to1(-27),32)!="-27.0")return 5;
     auto* frequency=processor.state.getParameter("lowpass");
     if(frequency->getText(frequency->convertTo0to1(20000),32)!="20000")return 6;
+    auto* model=processor.state.getParameter("style");
+    if(!model || model->getNumSteps()!=3)return 7;
+    model->setValueNotifyingHost(model->convertTo0to1(2));
     juce::MemoryBlock state;processor.getStateInformation(state);parameter->setValueNotifyingHost(parameter->convertTo0to1(-5));processor.setStateInformation(state.getData(),static_cast<int>(state.getSize()));
     if(std::abs(processor.snapshot()[arson::Threshold]+27)>0.01f)return 2;
+    if(std::abs(processor.snapshot()[arson::Style]-2.0f)>0.01f)return 8;
     juce::AudioBuffer<float> buffer(2,128);juce::MidiBuffer midi;
     for(int j=0;j<1000;++j) {buffer.clear();buffer.setSample(0,0,0.5f);processor.processBlock(buffer,midi);}
     for(int iteration=0;iteration<8;++iteration) {

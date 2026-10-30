@@ -5,8 +5,8 @@ ArSonComp is a lightweight live vocal, karaoke, podcast and mix-bus compressor, 
 ## Initial acceptance
 
 - Mono/stereo host processing, optional mono/stereo external sidechain, zero added sample delay.
-- Useful dynamics controls, bounded range, soft knee, Peak/RMS, stereo link and filtered detector audition.
-- Dominant transfer/history display; separate IN/GR/OUT meters; compact knobs and dark readable menus.
+- Useful dynamics controls, bounded range, soft knee, Peak/RMS, stereo link and filtered detector audition. Three genuinely different causal models with retained stable IDs and zero sample lookahead.
+- Dominant transfer/history display; separate IN/GR/OUT meters; compact, legible knobs, premium dark palette and usable model selector. Verify at minimum/default window sizes.
 - Presets with actual parameter values, A/B, host automation and state restoration.
 - No heap allocation/lock/wait in DSP; bounded metering and independent GUI lifetime.
 - DSP correctness tests, allocation guard, sanitizers, measured throughput, plugin state/editor smoke and Windows artifacts.
