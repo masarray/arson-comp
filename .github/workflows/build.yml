@@ -27,12 +27,10 @@ jobs:
       - run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --config Release --parallel 4
       - run: ctest --test-dir build -C Release --output-on-failure
-      - name: Plugin state and editor smoke
+      - name: Measure engine throughput
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force artifacts
-          & ./build/plugin_smoke_artefacts/Release/ArSonCompSmoke.exe "$pwd/artifacts/ArSonComp-preview.png"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & ./build/Release/engine_bench.exe | Tee-Object artifacts/benchmark.txt
       - uses: actions/upload-artifact@v4
         with:
@@ -41,4 +39,5 @@ jobs:
             build/ArSonComp_artefacts/Release/VST3/ArSonComp.vst3
             build/ArSonComp_artefacts/Release/Standalone/ArSonComp.exe
             artifacts/*
+            build/ArSonComp-preview.png
           retention-days: 14

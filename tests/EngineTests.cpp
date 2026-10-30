@@ -90,5 +90,16 @@ int main() {
         std::thread consumer([&]{for(int i=0;i<count;++i){MeterFrame f;while(!queue.pop(f))std::this_thread::yield();if(f.input!=static_cast<float>(i))good=false;}});
         producer.join();consumer.join();require(good,"SPSC publication order");
     }
+    {
+        const auto releaseAt150ms=[](bool automatic,float hold) {
+            Compressor c;Parameters p;p.value[Threshold]=-20;p.value[Knee]=0;p.value[Hold]=hold;p.value[AutoRelease]=automatic ? 1.0f : 0.0f;c.prepare(48000,p);
+            std::vector<float> data(48000,1.0f);float* ptr[]{data.data()};c.process(ptr,1,48000);
+            std::fill(data.begin(),data.end(),0.1f);c.process(ptr,1,7200);return -gainToDb(data[7199]/0.1f);
+        };
+        const auto normal=releaseAt150ms(false,0);
+        require(near(normal,15*std::exp(-1.0f),0.02f),"release time constant");
+        require(near(releaseAt150ms(false,50),15*std::exp(-2.0f/3),0.02f),"hold delays release by 50 ms");
+        require(releaseAt150ms(true,0)>normal,"adaptive release extends recovery");
+    }
     std::cout<<"PASS: "<<checks<<" checks\n";
 }
