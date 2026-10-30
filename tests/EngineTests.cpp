@@ -130,6 +130,41 @@ int main() {
         }
     }
     {
+        // No-op parameter snapshots must preserve ongoing ramps; a host
+        // may re-send unchanged values every 32 samples.
+        Parameters p;p.value[Threshold]=-10;
+        Compressor a,b;a.prepare(48000);b.prepare(48000);
+        a.setParameters(p);b.setParameters(p);
+        std::vector<float> continuous(4096,0.6f),fragmented(4096,0.6f);
+        float* cp[]{continuous.data()};a.process(cp,1,4096);
+        for(int offset=0;offset<4096;offset+=32) {
+            b.setParameters(p);
+            float* fp[]{fragmented.data()+offset};b.process(fp,1,32);
+        }
+        require(continuous==fragmented,"redundant host snapshots preserve sample ramps");
+
+        // Continuous automation with all three models, detector modes,
+        // sidechain filters, bypass and dry/wet must not allocate.
+        Compressor c;c.prepare(48000);
+        float left[64]{},right[64]{};float* audio[]{left,right};
+        const auto before=allocations.load();
+        for(int block=0;block<4000;++block) {
+            Parameters q;
+            q.value[Style]=static_cast<float>(block%3);
+            q.value[Threshold]=-40.0f+static_cast<float>(block%30);
+            q.value[Highpass]=20.0f+static_cast<float>(block%400);
+            q.value[Lowpass]=1000.0f+static_cast<float>(block%12000);
+            q.value[Detector]=static_cast<float>(block%2);
+            q.value[Mix]=static_cast<float>(block%101);
+            q.value[Bypass]=static_cast<float>(block%2);
+            c.setParameters(q);
+            for(int i=0;i<64;++i) {left[i]=0.4f;right[i]=-0.3f;}
+            c.process(audio,2,64);
+            for(int i=0;i<64;++i)require(std::isfinite(left[i])&&std::isfinite(right[i]),"automated output finite");
+        }
+        require(allocations.load()==before,"multi-model automation never allocates");
+    }
+    {
         Compressor c;Parameters p;for(auto& v:p.value)v=std::numeric_limits<float>::quiet_NaN();c.prepare(0,p);
         float a[]{std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN(),1e-38f,1};float* ptr[]{a};c.process(ptr,1,4);
         for(auto v:a)require(std::isfinite(v),"invalid input contained");

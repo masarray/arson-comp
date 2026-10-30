@@ -13,6 +13,10 @@ public:
     ~Editor() override;
     void paint(juce::Graphics&) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent&) override;
+    void mouseDrag(const juce::MouseEvent&) override;
+    void mouseUp(const juce::MouseEvent&) override;
+    void mouseMove(const juce::MouseEvent&) override;
 private:
     void timerCallback() override;
     void applyPreset(int);
@@ -27,12 +31,14 @@ private:
     using ButtonAttachment=juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::array<std::unique_ptr<SliderAttachment>,arson::Detector> attachments;
     juce::ComboBox presets,detector,style;
-    juce::TextButton compare{"A / B"};
+    juce::TextButton compare{"A / B"},compact{"MINI"};
     juce::ToggleButton autoRelease{"Auto release"},external{"External SC"},listen{"Listen SC"},bypass{"Bypass"};
     std::array<std::unique_ptr<ButtonAttachment>,4> buttons;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> detectorAttachment,styleAttachment;
     arson::Parameters alternate, presetSnapshot;
     bool alternateActive=false;
+    bool compactMode=false,thresholdDragging=false;
+    int expandedWidth=1040,expandedHeight=680;
     std::array<arson::MeterFrame,400> history{};
     std::size_t head=0;
     float inputDb=-120,outputDb=-120,gr=0;

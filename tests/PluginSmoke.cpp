@@ -19,7 +19,9 @@ int main(int argc,char** argv) {
     for(int j=0;j<1000;++j) {buffer.clear();buffer.setSample(0,0,0.5f);processor.processBlock(buffer,midi);}
     for(int iteration=0;iteration<8;++iteration) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
-        editor->setSize(iteration%2 ? 860 : 960,iteration%2 ? 570 : 600);
+        editor->setSize(iteration%2 ? 920 : 1040,iteration%2 ? 620 : 680);
+        if(editor->getWidth()!=(iteration%2 ? 920 : 1040) ||
+           editor->getHeight()!=(iteration%2 ? 620 : 680))return 9;
         editor->addToDesktop(0); editor->setVisible(true);
         for(int j=0;j<1500;++j) {
             for(int i=0;i<128;++i) {
@@ -32,6 +34,23 @@ int main(int argc,char** argv) {
         if(iteration==0) {
             juce::Timer::callAfterDelay(120,[]{juce::MessageManager::getInstance()->stopDispatchLoop();});
             juce::MessageManager::getInstance()->runDispatchLoop();
+        }
+        // Verify the real MINI/FULL UI transformation on the message thread.
+        if(iteration==2) {
+            auto* mini=dynamic_cast<juce::TextButton*>(editor->findChildWithID("view.compact"));
+            if(!mini || !mini->onClick)return 10;
+            mini->onClick();
+            if(editor->getHeight()!=380)return 11;
+            auto compactImage=editor->createComponentSnapshot(editor->getLocalBounds());
+            if(compactImage.isNull() || compactImage.getHeight()!=380)return 12;
+            if(argc>1) {
+                juce::File file(juce::String::fromUTF8(argv[1]));
+                file=file.getSiblingFile(file.getFileNameWithoutExtension()+"-compact.png");
+                auto stream=file.createOutputStream();
+                if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
+            }
+            mini->onClick();
+            if(editor->getHeight()!=680)return 14;
         }
         auto image=editor->createComponentSnapshot(editor->getLocalBounds());
         if(image.isNull())return 3;

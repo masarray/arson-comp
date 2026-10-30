@@ -34,10 +34,16 @@ void Compressor::setParameters(Parameters next) noexcept {
         releaseCoeff=static_cast<float>(std::exp(-1000.0/(next[Release]*fs)));
         slowReleaseCoeff=static_cast<float>(std::exp(-1000.0/(next[Release]*4.0*fs)));
     }
-    holdSamples=static_cast<int>(next[Hold]*0.001*fs);
-    for(std::size_t i=0;i<Count;++i) smooth[i].set(rampTarget(i,next[i],fs),rampLength);
-    filterWet[0].set(next[Highpass]>20.01f ? 1.0f : 0.0f,rampLength);
-    filterWet[1].set(next[Lowpass]<19999.0f ? 1.0f : 0.0f,rampLength);
+    // Host snapshots arrive every audio block, usually without parameter
+    // changes. Coalesce all target calculations; avoid exp() when idle.
+    if(next[Hold]!=p[Hold]) holdSamples=static_cast<int>(next[Hold]*0.001*fs);
+    for(std::size_t i=0;i<Count;++i) {
+        if(next[i]!=p[i]) smooth[i].set(rampTarget(i,next[i],fs),rampLength);
+    }
+    if(next[Highpass]!=p[Highpass])
+        filterWet[0].set(next[Highpass]>20.01f ? 1.0f : 0.0f,rampLength);
+    if(next[Lowpass]!=p[Lowpass])
+        filterWet[1].set(next[Lowpass]<19999.0f ? 1.0f : 0.0f,rampLength);
     p=next;
 }
 void Compressor::process(float* const* audio,int channels,int samples,const float* const* sc,int scChannels,MeterQueue* meters) noexcept {
@@ -65,7 +71,12 @@ void Compressor::process(float* const* audio,int channels,int samples,const floa
             listen[c]=x;
             rms[c]=flush(rmsCoeff*rms[c]+(1-rmsCoeff)*x*x);
             // Crossfade detector modes to avoid a discontinuity on automation.
-            detected[c]=std::abs(x)+(std::sqrt(rms[c])-std::abs(x))*v[Detector];
+            const float absLevel=std::abs(x);
+            const float rmsMix=v[Detector];
+            // Maintain RMS state when inactive for click-free detector
+            // switching, but skip sqrt() for the common Peak-only mode.
+            detected[c]=rmsMix<=0.0f ? absLevel
+                : absLevel+(std::sqrt(rms[c])-absLevel)*rmsMix;
         }
         const float linked=std::max(detected[0],detected[channels-1]);
         for(int c=0;c<channels;++c) {

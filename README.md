@@ -13,6 +13,8 @@ A compact live compressor: framework-independent C++17 DSP, JUCE VST3 and standa
 - Stable automation IDs and versioned state recall. New model `style` appended without renaming previous parameters. Mono and stereo layouts.
 - Separate engine without JUCE, locks, heap allocation, I/O, worker dependencies or delay lines in processing.
 - Bounded SPSC telemetry at 100 Hz; editor coalesces updates at 30 Hz, caches static grid, and repaints only the display during metering.
+- UI supports a warm graphite/brass/teal vintage theme, direct threshold-marker dragging, and a 380 px compact view without extra DSP work.
+- Host parameters are diffed once per block; unchanged input/makeup/filter parameters do not trigger redundant coefficient or exponent recalculation. Peak detection skips RMS square root while its RMS state remains warm.
 
 Zero latency means **0 additional samples from this plugin**, not zero audio-interface/host buffering. Fast attacks can distort low-frequency material; no lookahead means transients can pass. It is a compressor, not a brickwall limiter. The current model is feed-forward, without oversampling, saturation or linear-phase filtering.
 
@@ -49,7 +51,7 @@ Use `-DARSON_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug` on GCC/Clang for ASan/UBSan. 
 4. Enable External SC only after routing a detector signal in your host. An unconnected external bus receives silence.
 5. Use Listen SC to audition the detector, then turn it off. Match output loudness with Makeup before comparing A/B.
 
-Double-click knobs to reset; click values to type. Presets do not overwrite external sidechain, listen or bypass. A/B swaps all parameters; it is an editor-session comparison, not a second saved host program.
+Double-click knobs to reset; click values to type. The gold marker in the transfer display can also be dragged to automate Threshold with a single host gesture. MINI switches to a compact, hardware-inspired layout (FULL restores the previous size); this is a GUI-only choice that does not alter audio or latency. Presets do not overwrite external sidechain, listen or bypass. A/B swaps all parameters; it is an editor-session comparison, not a second saved host program.
 
 ## Verification and scope
 

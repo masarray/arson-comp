@@ -1,6 +1,7 @@
 #include "Editor.h"
 namespace {
-const juce::Colour bg{0xff11151b},panel{0xff161c24},line{0xff303b49},text{0xffe4eaf2},muted{0xff9aa7b8},cyan{0xff4edbd4},gold{0xffffc270};
+// Restrained original vintage palette: graphite, brushed brass, teal meters.
+const juce::Colour bg{0xff151715},panel{0xff1b211f},line{0xff3b4841},text{0xffeeeae0},muted{0xffadb6a7},cyan{0xff72cdb5},gold{0xffe4b969};
 }
 CompLook::CompLook() {
     setColour(juce::Slider::textBoxTextColourId,text);
@@ -84,11 +85,34 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     compare.setTooltip("Swap the current settings with the alternate A/B snapshot.");
     compare.onClick=[this] { const auto current=processor.snapshot(); for(std::size_t i=0;i<arson::Count;++i) setValue(i,alternate[i]); alternate=current; alternateActive=!alternateActive; compare.setButtonText(alternateActive ? "B / A" : "A / B"); presets.setSelectedId(0,juce::dontSendNotification); presets.setText("Custom",juce::dontSendNotification); };
     addAndMakeVisible(compare);
+    compact.setComponentID("view.compact");
+    compact.setTooltip("Toggle compact hardware-style view without losing settings.");
+    compact.onClick=[this] {
+        compactMode=!compactMode;
+        if(compactMode) {
+            expandedWidth=getWidth();expandedHeight=getHeight();
+            setResizeLimits(920,380,1320,380);
+            compact.setButtonText("FULL");
+            setSize(expandedWidth,380);
+        } else {
+            setResizeLimits(920,620,1320,840);
+            compact.setButtonText("MINI");
+            setSize(expandedWidth,expandedHeight);
+        }
+    };
+    addAndMakeVisible(compact);
     arson::MeterFrame discard; for(std::uint32_t i=0;i<arson::MeterQueue::capacity && p.meters.pop(discard);++i) {} // discard closed-editor backlog
     presets.setSelectedId(0,juce::dontSendNotification); presets.setText("Custom / restored",juce::dontSendNotification);
     setResizable(true,true); setResizeLimits(920,620,1320,840); setSize(1040,680); startTimerHz(30);
 }
-Editor::~Editor() { stopTimer(); setLookAndFeel(nullptr); }
+Editor::~Editor() {
+    stopTimer();
+    // Close an active host-automation gesture if the editor is destroyed
+    // while a graph drag is in progress.
+    if(thresholdDragging)
+        if(auto* p=processor.state.getParameter("threshold")) p->endChangeGesture();
+    setLookAndFeel(nullptr);
+}
 void Editor::setValue(std::size_t i,float value) {
     if(auto* param=processor.state.getParameter(arson::specs[i].id)) {
         param->beginChangeGesture(); param->setValueNotifyingHost(param->convertTo0to1(value)); param->endChangeGesture();
@@ -107,12 +131,14 @@ void Editor::applyPreset(int id) {
 }
 void Editor::resized() {
     const int w=getWidth(),h=getHeight();
+    compact.setBounds(213,26,50,27);
     style.setBounds(270,25,154,29);
     presets.setBounds(w-426,25,200,29);
     compare.setBounds(w-213,25,69,29);
     bypass.setBounds(w-135,25,113,29);
-    display={18,66,w-36,h-326};
-    const int y=display.getBottom()+14,knobWidth=(w-40)/8;
+    display=compactMode ? juce::Rectangle<int>{} : juce::Rectangle<int>{18,66,w-36,h-326};
+    const int y=compactMode ? 71 : display.getBottom()+14;
+    const int knobWidth=(w-40)/8;
     const std::array<std::size_t,8> primary{arson::Threshold,arson::Ratio,arson::Attack,
         arson::Release,arson::Knee,arson::Range,arson::Makeup,arson::Mix};
     for(std::size_t j=0;j<primary.size();++j) {
@@ -133,6 +159,7 @@ void Editor::resized() {
     autoRelease.setBounds(x+110,bottom+7,146,26);
     external.setBounds(x,bottom+43,125,26);
     listen.setBounds(x+135,bottom+43,120,26);
+    if(compactMode) {grid=juce::Image();return;}
     grid=juce::Image(juce::Image::RGB,display.getWidth(),display.getHeight(),true);
     juce::Graphics g(grid);
     g.fillAll(panel);
@@ -168,11 +195,12 @@ void Editor::timerCallback() {
         in=std::max(in,frame.input);out=std::max(out,frame.output);reduction=std::max(reduction,frame.reduction);
     }
     inputDb=std::max(arson::gainToDb(in),inputDb-1.2f); outputDb=std::max(arson::gainToDb(out),outputDb-1.2f); gr=std::max(reduction,gr-0.8f);
-    repaint(display);
+    if(compactMode) repaint(20,301,getWidth()-40,34);
+    else repaint(display);
 }
 void Editor::paint(juce::Graphics& g) {
     g.fillAll(bg);
-    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff212a35},0.0f,0.0f,bg,0.0f,64.0f,false));
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff2b302a},0.0f,0.0f,bg,0.0f,64.0f,false));
     g.fillRect(0,0,getWidth(),65);
     g.setColour(text);g.setFont(juce::FontOptions(21));
     g.drawText("ArSonComp",21,13,190,29,juce::Justification::centredLeft);
@@ -181,11 +209,35 @@ void Editor::paint(juce::Graphics& g) {
     g.drawText("LIVE DYNAMICS",88,44,145,14,juce::Justification::centredLeft);
     g.drawText("MODEL",271,8,146,15,juce::Justification::left);
     g.drawText("FACTORY PRESET",getWidth()-425,8,194,15,juce::Justification::left);
-    if(grid.isValid())g.drawImageAt(grid,display.getX(),display.getY());
-    g.setColour(line);g.drawRoundedRectangle(display.toFloat(),6.0f,1.0f);
-    drawDisplay(g);
+    if(!compactMode) {
+        if(grid.isValid())g.drawImageAt(grid,display.getX(),display.getY());
+        g.setColour(line);g.drawRoundedRectangle(display.toFloat(),6.0f,1.0f);
+        drawDisplay(g);
+    }
     g.setColour(line.withAlpha(0.75f));
-    g.drawHorizontalLine(display.getBottom()+123,20.0f,static_cast<float>(getWidth()-20));
+    g.drawHorizontalLine(compactMode ? 296 : display.getBottom()+123,
+        20.0f,static_cast<float>(getWidth()-20));
+    if(compactMode) {
+        // Compact mode retains essential performance metering rather than
+        // becoming a knob-only view. No cached graph is allocated.
+        const float values[]{inputDb,gr,outputDb};
+        const char* names[]{"IN","GR","OUT"};
+        const int section=(getWidth()-40)/3;
+        for(int i=0;i<3;++i) {
+            const float x=20.0f+static_cast<float>(i*section);
+            g.setColour(muted);g.setFont(juce::FontOptions(11));
+            g.drawText(names[i],static_cast<int>(x),309,34,20,juce::Justification::left);
+            const float bx=x+43.0f,bw=static_cast<float>(section-105);
+            g.setColour(line);g.fillRoundedRectangle(bx,314.0f,bw,7.0f,2.0f);
+            const float amount=i==1 ? juce::jlimit(0.0f,1.0f,values[i]/36.0f)
+                : juce::jlimit(0.0f,1.0f,(values[i]+60.0f)/60.0f);
+            g.setColour(i==1 ? gold : cyan);
+            if(amount>0.0f)g.fillRoundedRectangle(bx,314.0f,bw*amount,7.0f,2.0f);
+            g.setColour(text);g.setFont(juce::FontOptions(11));
+            g.drawText(values[i]<-99 ? "-inf" : juce::String(values[i],1),
+                static_cast<int>(x)+section-55,307,48,23,juce::Justification::centredRight);
+        }
+    }
     g.setColour(muted);g.setFont(juce::FontOptions(10.5f));
     g.drawText("0 SAMPLES ADDED   |   REAL-TIME DSP   |   VST3",20,getHeight()-25,455,17,juce::Justification::left);
     g.drawText("Drag controls  /  double-click reset  /  type exact values",
@@ -201,7 +253,7 @@ void Editor::drawDisplay(juce::Graphics& g) {
     const auto p=processor.snapshot();
     const float top=32.0f,bottom=h-35.0f;
     g.setFont(juce::FontOptions(11.0f));
-    g.setColour(muted);g.drawText("COMPRESSION CURVE",23,10,235,18,juce::Justification::left);
+    g.setColour(muted);g.drawText("TRANSFER  |  DRAG GOLD MARKER",23,10,250,18,juce::Justification::left);
     g.drawText("DYNAMICS  |  4s",291,10,230,18,juce::Justification::left);
 
     const juce::Rectangle<float> curve{26.0f,top,229.0f,bottom-top};
@@ -286,4 +338,45 @@ void Editor::drawDisplay(juce::Graphics& g) {
             static_cast<int>(left)+125,8,210,18,juce::Justification::left);
     }
 }
-
+    
+// Dragging the gold transfer marker is a real host-automatable control.
+// One host gesture covers the entire mouse interaction.
+void Editor::mouseDown(const juce::MouseEvent& event) {
+    if(compactMode || !display.contains(event.getPosition())) return;
+    const auto local=event.getPosition()-display.getPosition();
+    if(local.x<26 || local.x>255 || local.y<32 || local.y>display.getHeight()-35) return;
+    const float markerX=26.0f+
+        juce::jlimit(0.0f,1.0f,(processor.snapshot()[arson::Threshold]+60.0f)/60.0f)*229.0f;
+    if(std::abs(static_cast<float>(local.x)-markerX)>14.0f) return;
+    if(auto* p=processor.state.getParameter("threshold")) {
+        p->beginChangeGesture();
+        thresholdDragging=true;
+        mouseDrag(event);
+    }
+}
+void Editor::mouseDrag(const juce::MouseEvent& event) {
+    if(!thresholdDragging) return;
+    const float x=static_cast<float>(event.getPosition().x-display.getX());
+    const float threshold=-60.0f+60.0f*juce::jlimit(0.0f,1.0f,(x-26.0f)/229.0f);
+    if(auto* p=processor.state.getParameter("threshold"))
+        p->setValueNotifyingHost(p->convertTo0to1(threshold));
+    repaint(display);
+}
+void Editor::mouseUp(const juce::MouseEvent&) {
+    if(!thresholdDragging) return;
+    thresholdDragging=false;
+    if(auto* p=processor.state.getParameter("threshold")) p->endChangeGesture();
+    setMouseCursor(juce::MouseCursor::NormalCursor);
+}
+void Editor::mouseMove(const juce::MouseEvent& event) {
+    if(compactMode || !display.contains(event.getPosition())) {
+        setMouseCursor(juce::MouseCursor::NormalCursor);return;
+    }
+    const auto local=event.getPosition()-display.getPosition();
+    const float markerX=26.0f+
+        juce::jlimit(0.0f,1.0f,(processor.snapshot()[arson::Threshold]+60.0f)/60.0f)*229.0f;
+    const bool near=local.y>=32 && local.y<=display.getHeight()-35 &&
+        std::abs(static_cast<float>(local.x)-markerX)<=14.0f;
+    setMouseCursor(near ? juce::MouseCursor::PointingHandCursor
+                        : juce::MouseCursor::NormalCursor);
+}
