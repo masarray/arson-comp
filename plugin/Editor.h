@@ -31,10 +31,11 @@ private:
     using ButtonAttachment=juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::array<std::unique_ptr<SliderAttachment>,arson::Detector> attachments;
     juce::ComboBox presets,detector,style;
-    juce::TextButton compare{"A / B"},compact{"MINI"};
+    juce::TextButton compare{"A / B"},compact{"MINI"},savePreset{"SAVE"},loadPreset{"OPEN"};
     juce::ToggleButton autoRelease{"Auto release"},external{"External SC"},listen{"Listen SC"},bypass{"Bypass"};
     std::array<std::unique_ptr<ButtonAttachment>,4> buttons;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> detectorAttachment,styleAttachment;
+    std::unique_ptr<juce::FileChooser> presetChooser;
     arson::Parameters alternate, presetSnapshot;
     bool alternateActive=false;
     bool compactMode=false,thresholdDragging=false;

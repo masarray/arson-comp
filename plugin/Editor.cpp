@@ -1,4 +1,5 @@
 #include "Editor.h"
+#include "PresetIO.h"
 namespace {
 // Restrained original vintage palette: graphite, brushed brass, teal meters.
 const juce::Colour bg{0xff151715},panel{0xff1b211f},line{0xff3b4841},text{0xffeeeae0},muted{0xffadb6a7},cyan{0xff72cdb5},gold{0xffe4b969};
@@ -7,11 +8,11 @@ CompLook::CompLook() {
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colours::transparentBlack);
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colours::transparentBlack);
-    setColour(juce::ComboBox::backgroundColourId,juce::Colour{0xff252b33});
+    setColour(juce::ComboBox::backgroundColourId,juce::Colour{0xff29312c});
     setColour(juce::ComboBox::textColourId,text); setColour(juce::ComboBox::outlineColourId,line);
     setColour(juce::PopupMenu::backgroundColourId,bg); setColour(juce::PopupMenu::textColourId,text);
     setColour(juce::PopupMenu::highlightedBackgroundColourId,juce::Colour{0xff34505c});
-    setColour(juce::TextButton::buttonColourId,juce::Colour{0xff252b33});
+    setColour(juce::TextButton::buttonColourId,juce::Colour{0xff29312c});
     setColour(juce::TextButton::textColourOffId,text);
     setColour(juce::ToggleButton::textColourId,text); setColour(juce::ToggleButton::tickColourId,cyan);
     setColour(juce::Label::textColourId,muted);
@@ -85,6 +86,54 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     compare.setTooltip("Swap the current settings with the alternate A/B snapshot.");
     compare.onClick=[this] { const auto current=processor.snapshot(); for(std::size_t i=0;i<arson::Count;++i) setValue(i,alternate[i]); alternate=current; alternateActive=!alternateActive; compare.setButtonText(alternateActive ? "B / A" : "A / B"); presets.setSelectedId(0,juce::dontSendNotification); presets.setText("Custom",juce::dontSendNotification); };
     addAndMakeVisible(compare);
+    savePreset.setComponentID("preset.save");
+    loadPreset.setComponentID("preset.load");
+    savePreset.setTooltip("Export current settings as a portable .arsoncomp preset file.");
+    loadPreset.setTooltip("Import an ArSonComp preset; updates host state and all controls.");
+    savePreset.onClick=[this] {
+        const auto suggested=juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+            .getChildFile("ArSonComp-Preset.arsoncomp");
+        presetChooser=std::make_unique<juce::FileChooser>(
+            "Save ArSonComp preset",suggested,"*.arsoncomp");
+        juce::Component::SafePointer<Editor> safe(this);
+        presetChooser->launchAsync(juce::FileBrowserComponent::saveMode |
+            juce::FileBrowserComponent::canSelectFiles |
+            juce::FileBrowserComponent::warnAboutOverwriting,[safe](const juce::FileChooser& chooser) {
+                if(auto* editor=safe.getComponent()) {
+                    auto file=chooser.getResult();
+                    if(file==juce::File{}) return;
+                    if(!file.hasFileExtension(".arsoncomp")) file=file.withFileExtension(".arsoncomp");
+                    if(!arson::preset::save(editor->processor,file))
+                        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                            "Preset save failed","Could not write the selected preset file.");
+                }
+            });
+    };
+    loadPreset.onClick=[this] {
+        presetChooser=std::make_unique<juce::FileChooser>(
+            "Open ArSonComp preset",juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
+            "*.arsoncomp");
+        juce::Component::SafePointer<Editor> safe(this);
+        presetChooser->launchAsync(juce::FileBrowserComponent::openMode |
+            juce::FileBrowserComponent::canSelectFiles,[safe](const juce::FileChooser& chooser) {
+                if(auto* editor=safe.getComponent()) {
+                    const auto file=chooser.getResult();
+                    if(file==juce::File{}) return;
+                    if(!arson::preset::load(editor->processor,file)) {
+                        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,
+                            "Preset open failed","Unsupported or damaged .arsoncomp preset.");
+                        return;
+                    }
+                    editor->presetSnapshot=editor->processor.snapshot();
+                    editor->presets.setSelectedId(0,juce::dontSendNotification);
+                    editor->presets.setText("USER / "+file.getFileNameWithoutExtension(),
+                        juce::dontSendNotification);
+                    editor->repaint(editor->display);
+                }
+            });
+    };
+    addAndMakeVisible(savePreset);
+    addAndMakeVisible(loadPreset);
     compact.setComponentID("view.compact");
     compact.setTooltip("Toggle compact hardware-style view without losing settings.");
     compact.onClick=[this] {
@@ -107,6 +156,7 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
 }
 Editor::~Editor() {
     stopTimer();
+    presetChooser.reset();
     // Close an active host-automation gesture if the editor is destroyed
     // while a graph drag is in progress.
     if(thresholdDragging)
@@ -133,9 +183,11 @@ void Editor::resized() {
     const int w=getWidth(),h=getHeight();
     compact.setBounds(213,26,50,27);
     style.setBounds(270,25,154,29);
-    presets.setBounds(w-426,25,200,29);
-    compare.setBounds(w-213,25,69,29);
-    bypass.setBounds(w-135,25,113,29);
+    presets.setBounds(w-464,25,164,29);
+    savePreset.setBounds(w-294,25,46,29);
+    loadPreset.setBounds(w-242,25,46,29);
+    compare.setBounds(w-190,25,64,29);
+    bypass.setBounds(w-121,25,101,29);
     display=compactMode ? juce::Rectangle<int>{} : juce::Rectangle<int>{18,66,w-36,h-326};
     const int y=compactMode ? 71 : display.getBottom()+14;
     const int knobWidth=(w-40)/8;
@@ -195,7 +247,7 @@ void Editor::timerCallback() {
         in=std::max(in,frame.input);out=std::max(out,frame.output);reduction=std::max(reduction,frame.reduction);
     }
     inputDb=std::max(arson::gainToDb(in),inputDb-1.2f); outputDb=std::max(arson::gainToDb(out),outputDb-1.2f); gr=std::max(reduction,gr-0.8f);
-    if(compactMode) repaint(20,301,getWidth()-40,34);
+    if(compactMode) repaint(20,301,getWidth()-40,44);
     else repaint(display);
 }
 void Editor::paint(juce::Graphics& g) {
@@ -208,7 +260,7 @@ void Editor::paint(juce::Graphics& g) {
     g.setColour(muted);g.setFont(juce::FontOptions(10));
     g.drawText("LIVE DYNAMICS",88,44,145,14,juce::Justification::centredLeft);
     g.drawText("MODEL",271,8,146,15,juce::Justification::left);
-    g.drawText("FACTORY PRESET",getWidth()-425,8,194,15,juce::Justification::left);
+    g.drawText("PRESETS",getWidth()-463,8,164,15,juce::Justification::left);
     if(!compactMode) {
         if(grid.isValid())g.drawImageAt(grid,display.getX(),display.getY());
         g.setColour(line);g.drawRoundedRectangle(display.toFloat(),6.0f,1.0f);
@@ -226,16 +278,16 @@ void Editor::paint(juce::Graphics& g) {
         for(int i=0;i<3;++i) {
             const float x=20.0f+static_cast<float>(i*section);
             g.setColour(muted);g.setFont(juce::FontOptions(11));
-            g.drawText(names[i],static_cast<int>(x),309,34,20,juce::Justification::left);
-            const float bx=x+43.0f,bw=static_cast<float>(section-105);
-            g.setColour(line);g.fillRoundedRectangle(bx,314.0f,bw,7.0f,2.0f);
+            g.drawText(names[i],static_cast<int>(x)+3,305,55,17,juce::Justification::left);
+            g.setColour(text);g.setFont(juce::FontOptions(11.5f));
+            g.drawText(values[i]<-99 ? "-inf dB" : juce::String(values[i],1)+" dB",
+                static_cast<int>(x)+section-82,305,76,18,juce::Justification::centredRight);
+            const float bx=x+3.0f,bw=static_cast<float>(section-15);
+            g.setColour(line);g.fillRoundedRectangle(bx,331.0f,bw,6.0f,2.0f);
             const float amount=i==1 ? juce::jlimit(0.0f,1.0f,values[i]/36.0f)
                 : juce::jlimit(0.0f,1.0f,(values[i]+60.0f)/60.0f);
             g.setColour(i==1 ? gold : cyan);
-            if(amount>0.0f)g.fillRoundedRectangle(bx,314.0f,bw*amount,7.0f,2.0f);
-            g.setColour(text);g.setFont(juce::FontOptions(11));
-            g.drawText(values[i]<-99 ? "-inf" : juce::String(values[i],1),
-                static_cast<int>(x)+section-55,307,48,23,juce::Justification::centredRight);
+            if(amount>0.0f)g.fillRoundedRectangle(bx,331.0f,bw*amount,6.0f,2.0f);
         }
     }
     g.setColour(muted);g.setFont(juce::FontOptions(10.5f));

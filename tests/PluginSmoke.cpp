@@ -1,4 +1,5 @@
 #include "../plugin/Processor.h"
+#include "../plugin/PresetIO.h"
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <iostream>
 int main(int argc,char** argv) {
@@ -15,10 +16,22 @@ int main(int argc,char** argv) {
     juce::MemoryBlock state;processor.getStateInformation(state);parameter->setValueNotifyingHost(parameter->convertTo0to1(-5));processor.setStateInformation(state.getData(),static_cast<int>(state.getSize()));
     if(std::abs(processor.snapshot()[arson::Threshold]+27)>0.01f)return 2;
     if(std::abs(processor.snapshot()[arson::Style]-2.0f)>0.01f)return 8;
+    // Real portable preset export/import roundtrip, including new model ID.
+    const auto file=juce::File::getSpecialLocation(juce::File::tempDirectory)
+        .getNonexistentChildFile("ArSonComp-Smoke",".arsoncomp",false);
+    if(!arson::preset::save(processor,file))return 15;
+    parameter->setValueNotifyingHost(parameter->convertTo0to1(-7));
+    model->setValueNotifyingHost(model->convertTo0to1(0));
+    if(!arson::preset::load(processor,file))return 16;
+    if(std::abs(processor.snapshot()[arson::Threshold]+27)>0.01f ||
+       std::abs(processor.snapshot()[arson::Style]-2.0f)>0.01f)return 17;
+    file.deleteFile();
     juce::AudioBuffer<float> buffer(2,128);juce::MidiBuffer midi;
     for(int j=0;j<1000;++j) {buffer.clear();buffer.setSample(0,0,0.5f);processor.processBlock(buffer,midi);}
     for(int iteration=0;iteration<8;++iteration) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+        if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
+            return 18;
         editor->setSize(iteration%2 ? 920 : 1040,iteration%2 ? 620 : 680);
         if(editor->getWidth()!=(iteration%2 ? 920 : 1040) ||
            editor->getHeight()!=(iteration%2 ? 620 : 680))return 9;

@@ -8,4 +8,6 @@ Start with README, AGENTS, PRD, ARD and VALIDATION. Source of truth is the canon
 4. Profile with GUI open/closed and many instances at 32/64/128 samples. Optimize only measured hotspots.
 5. Work toward Pro-C workflow/quality with documented independent models; never add fake style labels mapped to indistinguishable algorithms.
 
+The next batch addresses fast real-world testing: a single Windows artifact rooted at Plugin/, Standalone/, Screenshots/, plus SHA256 checksums and a quickstart; SAVE/OPEN provides versioned portable preset XML outside the audio callback, with automated roundtrip testing. MINI meter labels are separated from bars for readability. Verify the new UI Windows artifact before promoting the build.
+
 Keep builds grouped: one relevant-PR workflow with Linux safety and one Windows artifact. No gratuitous matrix or repeated manual runs.
