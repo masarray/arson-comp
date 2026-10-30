@@ -15,6 +15,17 @@ CompLook::CompLook() {
     setColour(juce::ToggleButton::textColourId,text); setColour(juce::ToggleButton::tickColourId,cyan);
     setColour(juce::Label::textColourId,muted);
 }
+juce::Label* CompLook::createSliderTextBox(juce::Slider& slider) {
+    auto* label=juce::LookAndFeel_V4::createSliderTextBox(slider);
+    label->setFont(juce::FontOptions(12));
+    label->setColour(juce::Label::outlineColourId,juce::Colours::transparentBlack);
+    label->setColour(juce::Label::textColourId,text);
+    label->setColour(juce::TextEditor::backgroundColourId,panel);
+    label->setColour(juce::TextEditor::textColourId,text);
+    label->setColour(juce::TextEditor::outlineColourId,line);
+    label->setColour(juce::TextEditor::focusedOutlineColourId,cyan);
+    return label;
+}
 void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,float pos,float start,float end,juce::Slider&) {
     const auto bounds=juce::Rectangle<float>(static_cast<float>(x),static_cast<float>(y),static_cast<float>(w),static_cast<float>(h)).reduced(6);
     const float r=std::min(bounds.getWidth(),bounds.getHeight())*0.5f,cx=bounds.getCentreX(),cy=bounds.getCentreY();
@@ -31,17 +42,18 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     setLookAndFeel(&look); setOpaque(true);
     for(std::size_t i=0;i<knobs.size();++i) {
         const auto& s=arson::specs[i]; auto& k=knobs[i];
+        k.setLookAndFeel(&look);
         k.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
         k.setTextBoxStyle(juce::Slider::TextBoxBelow,false,90,20);
         k.setTextValueSuffix(s.unit); k.setNumDecimalPlacesToDisplay(i==arson::Attack || i==arson::Ratio ? 2 : 1);
         k.setDoubleClickReturnValue(true,s.initial); k.setScrollWheelEnabled(false);
-        k.setName(s.name); k.setTooltip(juce::String(s.name)+" — drag to adjust, double-click to reset; click value to type.");
+        k.setName(s.name); k.setTooltip(juce::String(s.name)+" - drag to adjust, double-click to reset; click value to type.");
         addAndMakeVisible(k); labels[i].setText(s.name,juce::dontSendNotification);
         labels[i].setFont(juce::FontOptions(12)); labels[i].setJustificationType(juce::Justification::centred);
         addAndMakeVisible(labels[i]);
         attachments[i]=std::make_unique<SliderAttachment>(p.state,s.id,k);
     }
-    presets.addItemList({"Default","Vocal · gentle","Vocal · level","Mix bus · glue","Drums · punch","Podcast · steady"},1);
+    presets.addItemList({"Default","Vocal | gentle","Vocal | level","Mix bus | glue","Drums | punch","Podcast | steady"},1);
     presets.setSelectedId(1,juce::dontSendNotification); presets.onChange=[this]{applyPreset(presets.getSelectedId());};
     presets.setTooltip("Factory starting points. Adjust threshold to your input level."); addAndMakeVisible(presets);
     detector.addItemList({"Peak","RMS"},1); addAndMakeVisible(detector);
@@ -124,7 +136,7 @@ void Editor::paint(juce::Graphics& g) {
     g.setColour(muted);g.setFont(juce::FontOptions(11));g.drawText("LIVE COMPRESSOR",170,18,150,24,juce::Justification::centredLeft);
     g.drawImageAt(grid,display.getX(),display.getY());drawDisplay(g);
     g.setColour(line);g.drawHorizontalLine(display.getBottom()+133,20.0f,static_cast<float>(getWidth()-20));
-    g.setColour(muted);g.setFont(juce::FontOptions(11));g.drawText("0 samples latency  ·  No lookahead  ·  Native processing",22,getHeight()-25,400,18,juce::Justification::centredLeft);
+    g.setColour(muted);g.setFont(juce::FontOptions(11));g.drawText("0 samples latency  |  No lookahead  |  Native processing",22,getHeight()-25,400,18,juce::Justification::centredLeft);
     g.drawText("Double-click to reset  /  Click value to type",getWidth()-310,getHeight()-25,288,18,juce::Justification::centredRight);
 }
 void Editor::drawDisplay(juce::Graphics& g) {
@@ -144,7 +156,7 @@ void Editor::drawDisplay(juce::Graphics& g) {
     const float dotX=curve.getX()+juce::jlimit(0.0f,1.0f,(inputDb+60)/60)*curve.getWidth();
     const float dotY=cy(inputDb-arson::reduction(inputDb,p[arson::Threshold],p[arson::Ratio],p[arson::Knee],p[arson::Range]));
     g.fillEllipse(dotX-3,dotY-3,6,6);
-    g.setColour(muted);g.drawText("−60            Input dB             0",14,static_cast<int>(h)-28,168,18,juce::Justification::centred);
+    g.setColour(muted);g.drawText("-60            Input dB             0",14,static_cast<int>(h)-28,168,18,juce::Justification::centred);
     const float left=200,right=w-148,top=26,bottom=h-26;
     const auto y=[&](float level){return bottom-juce::jlimit(0.0f,1.0f,(level+60)/60)*(bottom-top);};
     juce::Path input,output,reduction;
@@ -159,7 +171,7 @@ void Editor::drawDisplay(juce::Graphics& g) {
     g.setColour(gold);g.strokePath(reduction,juce::PathStrokeType(1.5f));
     g.setColour(gold.withAlpha(0.35f));g.drawHorizontalLine(static_cast<int>(y(p[arson::Threshold])),left,right);
     g.setColour(muted);g.drawText("IN",202,5,30,18,juce::Justification::left);g.setColour(cyan);g.drawText("OUT",238,5,40,18,juce::Justification::left);
-    g.setColour(gold);g.drawText("GR  0–36 dB",285,5,110,18,juce::Justification::left);
+    g.setColour(gold);g.drawText("GR  0-36 dB",285,5,110,18,juce::Justification::left);
     const float values[]{inputDb,gr,outputDb};const char* names[]{"IN","GR","OUT"};
     for(int i=0;i<3;++i) {
         const int x=static_cast<int>(w)-106+i*35;
@@ -168,7 +180,7 @@ void Editor::drawDisplay(juce::Graphics& g) {
         const float amount=i==1 ? juce::jlimit(0.0f,1.0f,values[i]/36) : juce::jlimit(0.0f,1.0f,(values[i]+60)/60);
         const float bar=(h-76)*amount;g.setColour(i==1 ? gold : cyan);
         g.fillRect(static_cast<float>(x+7),i==1 ? 36.0f : h-40-bar,9.0f,bar);
-        g.setColour(text);g.drawText(values[i]<-99 ? "−∞" : juce::String(values[i],1),x-8,static_cast<int>(h)-30,42,18,juce::Justification::centred);
+        g.setColour(text);g.drawText(values[i]<-99 ? "-inf" : juce::String(values[i],1),x-8,static_cast<int>(h)-30,42,18,juce::Justification::centred);
     }
     if(p[arson::Listen]>0.5f || p[arson::Bypass]>0.5f) {
         g.setColour(gold);g.drawText(p[arson::Bypass]>0.5f ? "BYPASSED" : "SIDECHAIN LISTEN",static_cast<int>(left),static_cast<int>(h)-23,250,18,juce::Justification::left);

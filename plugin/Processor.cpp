@@ -8,7 +8,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout Processor::layout() {
         else if(i>arson::Detector) result.add(std::make_unique<juce::AudioParameterBool>(id,s.name,s.initial>0.5f));
         else result.add(std::make_unique<juce::AudioParameterFloat>(id,s.name,
             juce::NormalisableRange<float>{s.min,s.max,0.0f,s.skew},s.initial,
-            juce::AudioParameterFloatAttributes{}.withLabel(s.unit)));
+            juce::AudioParameterFloatAttributes{}.withLabel(s.unit).withStringFromValueFunction(
+                [i](float value,int) {
+                    if(i==arson::Highpass || i==arson::Lowpass) return juce::String(juce::roundToInt(value));
+                    const int decimals=(i==arson::Ratio || (i==arson::Attack && value<10)) ? 2 : 1;
+                    return juce::String(value,decimals);
+                })));
     }
     return result;
 }

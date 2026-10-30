@@ -39,5 +39,5 @@ jobs:
             build/ArSonComp_artefacts/Release/VST3/ArSonComp.vst3
             build/ArSonComp_artefacts/Release/Standalone/ArSonComp.exe
             artifacts/*
-            build/ArSonComp-preview.png
+            build/ArSonComp-preview*.png
           retention-days: 14

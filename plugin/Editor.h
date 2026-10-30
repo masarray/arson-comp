@@ -4,6 +4,7 @@
 class CompLook final : public juce::LookAndFeel_V4 {
 public:
     CompLook();
+    juce::Label* createSliderTextBox(juce::Slider&) override;
     void drawRotarySlider(juce::Graphics&,int,int,int,int,float,float,float,juce::Slider&) override;
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {
