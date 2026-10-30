@@ -1,0 +1,44 @@
+name: Validate and build
+on:
+  pull_request:
+    paths: ['engine/**', 'plugin/**', 'tests/**', 'CMakeLists.txt', '.github/workflows/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arson-comp-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engine-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DARSON_BUILD_PLUGIN=OFF -DARSON_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+      - run: cmake --build build --parallel 2
+      - run: ctest --test-dir build --output-on-failure
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: build/_deps/juce-src
+          key: juce-8.0.12-29396c22-windows
+      - run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --config Release --parallel 4
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - name: Plugin state and editor smoke
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts
+          & ./build/plugin_smoke_artefacts/Release/plugin_smoke.exe "$pwd/artifacts/ArSonComp-preview.png"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./build/Release/engine_bench.exe | Tee-Object artifacts/benchmark.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArSonComp-Windows-x64-TestBuild
+          path: |
+            build/ArSonComp_artefacts/Release/VST3/ArSonComp.vst3
+            build/ArSonComp_artefacts/Release/Standalone/ArSonComp.exe
+            artifacts/*
+          retention-days: 14
