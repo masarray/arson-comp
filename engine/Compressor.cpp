@@ -104,8 +104,14 @@ void Compressor::process(float* const* audio,int channels,int samples,const floa
             out+=(listen[c]-out)*v[Listen];
             out=v[Bypass]>=1.0f ? original[c] : out+(original[c]-out)*v[Bypass];
             audio[c][n]=out;
-            meter.input=std::max(meter.input,std::abs(dry[c]));
-            meter.output=std::max(meter.output,std::abs(out));
+            const float inPeak=std::abs(dry[c]),outPeak=std::abs(out);
+            meter.channels=channels;
+            meter.inputChannel[static_cast<std::size_t>(c)]=
+                std::max(meter.inputChannel[static_cast<std::size_t>(c)],inPeak);
+            meter.outputChannel[static_cast<std::size_t>(c)]=
+                std::max(meter.outputChannel[static_cast<std::size_t>(c)],outPeak);
+            meter.input=std::max(meter.input,inPeak);
+            meter.output=std::max(meter.output,outPeak);
             meter.reduction=std::max(meter.reduction,effectiveEnv*(1-v[Bypass]));
         }
         if(++meterCount>=meterPeriod) {

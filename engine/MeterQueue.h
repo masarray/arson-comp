@@ -3,7 +3,13 @@
 #include <atomic>
 #include <cstdint>
 namespace arson {
-struct MeterFrame { float input=0, output=0, reduction=0; };
+struct MeterFrame {
+    // One producer, one consumer. Stereo peaks are actual per-channel
+    // values, not two duplicated bars derived from a mono maximum.
+    float input=0, output=0, reduction=0;
+    std::array<float,2> inputChannel{}, outputChannel{};
+    int channels=1;
+};
 // One audio producer, one editor consumer. Full queue drops visualization only.
 class MeterQueue {
 public:

@@ -32,9 +32,17 @@ int main(int argc,char** argv) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
-        editor->setSize(iteration%2 ? 920 : 1040,iteration%2 ? 620 : 680);
-        if(editor->getWidth()!=(iteration%2 ? 920 : 1040) ||
-           editor->getHeight()!=(iteration%2 ? 620 : 680))return 9;
+        editor->setSize(iteration%2 ? 960 : 1120,iteration%2 ? 670 : 760);
+        if(editor->getWidth()!=(iteration%2 ? 960 : 1120) ||
+           editor->getHeight()!=(iteration%2 ? 670 : 760))return 9;
+        const auto* threshold=editor->findChildWithID("param.threshold");
+        const auto* input=editor->findChildWithID("param.input");
+        const auto* ratio=editor->findChildWithID("param.ratio");
+        const auto* attack=editor->findChildWithID("param.attack");
+        if(!threshold || !input || !ratio || !attack ||
+           !(input->getX()<attack->getX() && attack->getX()<threshold->getX() &&
+             threshold->getX()<ratio->getX()))return 19;
+        if(threshold->getBounds().intersects(ratio->getBounds()))return 20;
         editor->addToDesktop(0); editor->setVisible(true);
         for(int j=0;j<1500;++j) {
             for(int i=0;i<128;++i) {
@@ -63,7 +71,7 @@ int main(int argc,char** argv) {
                 if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
             }
             mini->onClick();
-            if(editor->getHeight()!=680)return 14;
+            if(editor->getHeight()!=760)return 14;
         }
         auto image=editor->createComponentSnapshot(editor->getLocalBounds());
         if(image.isNull())return 3;

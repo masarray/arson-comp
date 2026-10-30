@@ -6,6 +6,9 @@ public:
     CompLook();
     juce::Label* createSliderTextBox(juce::Slider&) override;
     void drawRotarySlider(juce::Graphics&,int,int,int,int,float,float,float,juce::Slider&) override;
+    void drawLinearSlider(juce::Graphics&,int,int,int,int,float,float,float,
+                          const juce::Slider::SliderStyle,juce::Slider&) override;
+    void drawToggleButton(juce::Graphics&,juce::ToggleButton&,bool,bool) override;
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {
 public:
@@ -22,6 +25,11 @@ private:
     void applyPreset(int);
     void setValue(std::size_t,float);
     void drawDisplay(juce::Graphics&);
+    juce::Rectangle<float> plotBounds() const noexcept;
+    void refreshTransfer(const arson::Parameters&,juce::Rectangle<float>);
+    void drawMeter(juce::Graphics&,juce::Rectangle<float>,float,float,
+                   const juce::String&,bool);
+    void paintCompactMeters(juce::Graphics&);
     Processor& processor;
     CompLook look;
     juce::TooltipWindow tooltip{this,650};
@@ -43,7 +51,12 @@ private:
     std::array<arson::MeterFrame,400> history{};
     std::size_t head=0;
     float inputDb=-120,outputDb=-120,gr=0;
+    std::array<float,2> inChannelDb{{-120.0f,-120.0f}},outChannelDb{{-120.0f,-120.0f}};
+    int currentChannels=2;
     juce::Rectangle<int> display;
     juce::Image grid;
+    juce::Path transferCurve,transferShade;
+    std::array<float,4> cachedCurveKey{{999,999,999,999}};
+    float cachedCurveWidth=-1;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Editor)
 };

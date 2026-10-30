@@ -11,3 +11,7 @@ Start with README, AGENTS, PRD, ARD and VALIDATION. Source of truth is the canon
 The next batch addresses fast real-world testing: a single Windows artifact rooted at Plugin/, Standalone/, Screenshots/, plus SHA256 checksums and a quickstart; SAVE/OPEN provides versioned portable preset XML outside the audio callback, with automated roundtrip testing. MINI meter labels are separated from bars for readability. Verify the new UI Windows artifact before promoting the build.
 
 Keep builds grouped: one relevant-PR workflow with Linux safety and one Windows artifact. No gratuitous matrix or repeated manual runs.
+
+## Current priority: reference visual fidelity + previous build regression
+
+The supplied red ArSonComp mockup is now the acceptance layout for a full-width integrated transfer/compression graph, side LED meters with true stereo peaks, animated actual GR, red dissolving fill, dominant Threshold knob, and two-row compact controls. Preserve no-lookahead live mode. IMPORTANT: CI for f847fa6 failed because PresetIO.h incorrectly called juce namespace functions getXmlFromBinary/copyXmlToBinary. Correct public API is juce::AudioProcessor::getXmlFromBinary/copyXmlToBinary. Validate Windows compile and the three screenshot variants before claiming milestone completed. Keep one grouped commit/CI and retain Draft until real verification.

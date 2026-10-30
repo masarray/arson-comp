@@ -178,6 +178,24 @@ int main() {
         MeterFrame f;int count=0;while(q.pop(f))++count;require(count==511,"bounded telemetry drops on saturation");
     }
     {
+        // Two LED meter columns must carry genuinely independent channel
+        // peak values, rather than duplicating one shared maximum.
+        Compressor c;Parameters p;p.value[Ratio]=1.0f;c.prepare(48000,p);
+        float left[480],right[480];
+        for(int i=0;i<480;++i){left[i]=0.2f;right[i]=0.65f;}
+        float* audio[]{left,right};
+        MeterQueue meter;
+        c.process(audio,2,480,nullptr,0,&meter);
+        MeterFrame f;
+        require(meter.pop(f),"one meter frame per 10 milliseconds");
+        require(f.channels==2,"stereo metering channel count");
+        require(near(f.inputChannel[0],0.2f) && near(f.inputChannel[1],0.65f),
+            "independent stereo input peaks");
+        require(near(f.outputChannel[0],0.2f) && near(f.outputChannel[1],0.65f),
+            "independent stereo output peaks");
+        require(near(f.input,0.65f),"aggregate peak remains unchanged");
+    }
+    {
         MeterQueue queue;constexpr int count=100000;std::atomic<bool> good{true};
         std::thread producer([&]{for(int i=0;i<count;++i)while(!queue.push({static_cast<float>(i),0,0}))std::this_thread::yield();});
         std::thread consumer([&]{for(int i=0;i<count;++i){MeterFrame f;while(!queue.pop(f))std::this_thread::yield();if(f.input!=static_cast<float>(i))good=false;}});

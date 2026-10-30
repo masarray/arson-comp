@@ -8,7 +8,7 @@ namespace arson::preset {
 inline bool save(Processor& processor, const juce::File& file) {
     juce::MemoryBlock bytes;
     processor.getStateInformation(bytes);
-    auto xml=juce::getXmlFromBinary(bytes.getData(),static_cast<int>(bytes.getSize()));
+    auto xml=juce::AudioProcessor::getXmlFromBinary(bytes.getData(),static_cast<int>(bytes.getSize()));
     return xml!=nullptr && file.hasFileExtension(".arsoncomp") && xml->writeTo(file);
 }
 inline bool load(Processor& processor, const juce::File& file) {
@@ -18,7 +18,7 @@ inline bool load(Processor& processor, const juce::File& file) {
     if(!xml || !xml->hasTagName("ArSonCompState")
         || xml->getIntAttribute("schema",1)!=1) return false;
     juce::MemoryBlock bytes;
-    juce::copyXmlToBinary(*xml,bytes);
+    juce::AudioProcessor::copyXmlToBinary(*xml,bytes);
     processor.setStateInformation(bytes.getData(),static_cast<int>(bytes.getSize()));
     return true;
 }

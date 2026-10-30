@@ -2,7 +2,7 @@
 
 A compact live compressor: framework-independent C++17 DSP, JUCE VST3 and standalone, zero added algorithmic latency. The interface prioritizes transfer curve, input/output history and gain reduction, with familiar compressor controls and an original ArSon visual identity.
 
-**Status: engineering test build with three original compression models and a redesigned graphical interface, not claimed to match FabFilter's proprietary algorithms or sound.**
+**Status: engineering test build; the integrated full-graph reference layout is under Windows CI verification. No claim of exact sonic/feature parity with FabFilter.**
 
 ## Implemented
 
@@ -13,7 +13,7 @@ A compact live compressor: framework-independent C++17 DSP, JUCE VST3 and standa
 - Stable automation IDs and versioned state recall. New model `style` appended without renaming previous parameters. Mono and stereo layouts.
 - Separate engine without JUCE, locks, heap allocation, I/O, worker dependencies or delay lines in processing.
 - Bounded SPSC telemetry at 100 Hz; editor coalesces updates at 30 Hz, caches static grid, and repaints only the display during metering.
-- UI supports a warm graphite/brass/teal vintage theme, direct threshold-marker dragging, and a 380 px compact view without extra DSP work.
+- Full-width integrated compressor graph: responsive input/output/GR history, red transfer curve and dissolving gradient, actual independent stereo LED IN/OUT on the sides, and a distinct GR meter. Dominant Threshold control, red hardware knobs, bottom control strip, and 380px MINI layout. The real threshold marker is draggable via host automation.
 - Host parameters are diffed once per block; unchanged input/makeup/filter parameters do not trigger redundant coefficient or exponent recalculation. Peak detection skips RMS square root while its RMS state remains warm.
 
 Zero latency means **0 additional samples from this plugin**, not zero audio-interface/host buffering. Fast attacks can distort low-frequency material; no lookahead means transients can pass. It is a compressor, not a brickwall limiter. The three selectable causal models are Clean feed-forward, Feedback, and Smooth dual-envelope; none uses oversampling, saturation or linear-phase filtering.
@@ -58,3 +58,7 @@ Double-click knobs to reset; click values to type. Use SAVE and OPEN in the head
 See [architecture](docs/ARD.md), [requirements](docs/PRD.md), [validation](docs/VALIDATION.md) and [handoff](docs/HANDOFF.md). CI runs on relevant PR changes or manual dispatch, cancels superseded builds, caches JUCE source and uploads one installation-ready Windows VST3/standalone test artifact (with screenshots, benchmark, SHA256 checksums and START-HERE instructions). Documentation-only changes do not trigger builds.
 
 Repository license remains AGPL-3.0. JUCE has its own AGPL/commercial terms; see its pinned source license. FabFilter names identify workflow references only; no FabFilter code, assets or algorithm claims are included.
+
+## GUI visual reference and acceptance
+
+The newly redesigned UI uses the user-supplied ArSonComp mockup as a layout acceptance target: integrated upper graph, side meters, red glow and premium hardware controls. No bitmap UI assets, lookahead, worker waits or added algorithmic sample delay. The static graph background builds only on resize and the transfer curve is cached until threshold/ratio/knee/range or width changes. Windows test screenshots must show default 1120x760, minimum 960x670 and MINI 380px. A prior Windows CI build of the portable-preset milestone failed to compile due to incorrectly qualified JUCE XML helper methods; the new milestone fixes these to public AudioProcessor static methods.

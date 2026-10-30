@@ -28,3 +28,7 @@ Run `Standalone/ArSonComp.exe`. Select the input/output device in the standalone
 `Screenshots/` has Windows editor smoke captures. `benchmark.txt` is a machine-dependent 48-kHz/64-frame microbenchmark and **not** a DAW dropout guarantee. `SHA256SUMS.txt` contains hashes of the executable plugin payloads.
 
 FabFilter Pro-C is an independent benchmark for workflow/quality only. No FabFilter code, UI asset or proprietary algorithm is included.
+
+### New full-graph GUI acceptance
+
+Check upper central transfer graph, red fading curve and live gain reduction line, left input stereo LED meters, right GR and output stereo LEDs, and enlarged Threshold knob. Check the default/minimum/MINI screenshots from this commit, not a previous ZIP. No lookahead is present in the zero-added-sample live signal path.
