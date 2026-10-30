@@ -45,7 +45,7 @@ if(ARSON_BUILD_PLUGIN)
   target_link_libraries(ArSonComp PRIVATE arson_engine juce::juce_audio_utils
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags)
   if(BUILD_TESTING)
-    juce_add_console_app(plugin_smoke PRODUCT_NAME "ArSonComp smoke")
+    juce_add_console_app(plugin_smoke PRODUCT_NAME "ArSonCompSmoke")
     target_sources(plugin_smoke PRIVATE tests/PluginSmoke.cpp)
     target_link_libraries(plugin_smoke PRIVATE ArSonComp arson_engine juce::juce_audio_utils)
   endif()

@@ -31,7 +31,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force artifacts
-          & ./build/plugin_smoke_artefacts/Release/plugin_smoke.exe "$pwd/artifacts/ArSonComp-preview.png"
+          & ./build/plugin_smoke_artefacts/Release/ArSonCompSmoke.exe "$pwd/artifacts/ArSonComp-preview.png"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & ./build/Release/engine_bench.exe | Tee-Object artifacts/benchmark.txt
       - uses: actions/upload-artifact@v4
