@@ -23,10 +23,12 @@ private:
     };
     Parameters p;
     std::array<Ramp,Count> smooth{};
+    // Filter on/off is blended separately from cutoff coefficients to avoid endpoint steps.
+    std::array<Ramp,2> filterWet{};
     std::array<float,2> hpState{}, lpState{}, rms{}, envelope{};
     std::array<int,2> holdRemaining{};
     double fs=48000;
-    float attackCoeff=0,releaseCoeff=0,slowReleaseCoeff=0,rmsCoeff=0,hpCoeff=0,lpCoeff=0;
+    float attackCoeff=0,releaseCoeff=0,slowReleaseCoeff=0,rmsCoeff=0;
     int rampLength=240, meterPeriod=480, meterCount=0,holdSamples=0;
     MeterFrame meter{};
 };

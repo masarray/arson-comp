@@ -3,6 +3,14 @@ namespace arson {
 namespace {
 float clean(float x) noexcept { return std::isfinite(x) ? std::clamp(x,-32.0f,32.0f) : 0.0f; }
 float flush(float x) noexcept { return std::abs(x)<1.0e-20f ? 0.0f : x; }
+// Coefficients are calculated on control updates, not in the sample loop.
+// Existing parameter ramps carry the one-pole coefficient for the two filters.
+float rampTarget(std::size_t index,float value,double fs) noexcept {
+    if(index==Input || index==Makeup) return dbToGain(value);
+    if(index==Highpass) return static_cast<float>(std::exp(-6.28318530718*value/fs));
+    if(index==Lowpass) return static_cast<float>(std::exp(-6.28318530718*std::min<double>(value,fs*0.45)/fs));
+    return value;
+}
 }
 void Compressor::prepare(double rate,const Parameters& initial) noexcept {
     fs=std::isfinite(rate) ? std::clamp(rate,8000.0,384000.0) : 48000;
@@ -11,9 +19,13 @@ void Compressor::prepare(double rate,const Parameters& initial) noexcept {
     hpState={}; lpState={}; rms={}; envelope={}; holdRemaining={}; meter={}; meterCount=0;
     rmsCoeff=static_cast<float>(std::exp(-1.0/(0.01*fs)));
     p=initial; p.sanitize();
-    for(std::size_t i=0;i<Count;++i) smooth[i].reset(i==Input || i==Makeup ? dbToGain(p[i]) : p[i]);
-    // Force coefficient calculation on prepare, including when defaults are unchanged.
-    const auto actual=p; p.value.fill(-999); setParameters(actual);
+    for(std::size_t i=0;i<Count;++i) smooth[i].reset(rampTarget(i,p[i],fs));
+    filterWet[0].reset(p[Highpass]>20.01f ? 1.0f : 0.0f);
+    filterWet[1].reset(p[Lowpass]<19999.0f ? 1.0f : 0.0f);
+    attackCoeff=static_cast<float>(std::exp(-1000.0/(p[Attack]*fs)));
+    releaseCoeff=static_cast<float>(std::exp(-1000.0/(p[Release]*fs)));
+    slowReleaseCoeff=static_cast<float>(std::exp(-1000.0/(p[Release]*4.0*fs)));
+    holdSamples=static_cast<int>(p[Hold]*0.001*fs);
 }
 void Compressor::setParameters(Parameters next) noexcept {
     next.sanitize();
@@ -22,27 +34,29 @@ void Compressor::setParameters(Parameters next) noexcept {
         releaseCoeff=static_cast<float>(std::exp(-1000.0/(next[Release]*fs)));
         slowReleaseCoeff=static_cast<float>(std::exp(-1000.0/(next[Release]*4.0*fs)));
     }
-    if(next[Highpass]!=p[Highpass]) hpCoeff=static_cast<float>(std::exp(-6.28318530718*next[Highpass]/fs));
-    if(next[Lowpass]!=p[Lowpass]) lpCoeff=static_cast<float>(std::exp(-6.28318530718*std::min<double>(next[Lowpass],fs*0.45)/fs));
     holdSamples=static_cast<int>(next[Hold]*0.001*fs);
-    for(std::size_t i=0;i<Count;++i) smooth[i].set(i==Input || i==Makeup ? dbToGain(next[i]) : next[i],rampLength);
+    for(std::size_t i=0;i<Count;++i) smooth[i].set(rampTarget(i,next[i],fs),rampLength);
+    filterWet[0].set(next[Highpass]>20.01f ? 1.0f : 0.0f,rampLength);
+    filterWet[1].set(next[Lowpass]<19999.0f ? 1.0f : 0.0f,rampLength);
     p=next;
 }
 void Compressor::process(float* const* audio,int channels,int samples,const float* const* sc,int scChannels,MeterQueue* meters) noexcept {
     if(!audio || channels<1 || channels>2 || samples<=0) return;
-    const bool external=p[External]>0.5f;
     for(int n=0;n<samples;++n) {
         std::array<float,Count> v{};
         for(std::size_t i=0;i<Count;++i) v[i]=smooth[i].next();
         const float inputGain=v[Input],makeupGain=v[Makeup];
+        const float hpCoeff=v[Highpass],lpCoeff=v[Lowpass];
+        const float hpWet=filterWet[0].next(),lpWet=filterWet[1].next();
         float original[2]{},dry[2]{},detected[2]{},listen[2]{};
         for(int c=0;c<channels;++c) {
             original[c]=clean(audio[c][n]); dry[c]=original[c]*inputGain;
-            float x=external ? ((sc && scChannels>0) ? clean(sc[std::min(c,scChannels-1)][n]) : 0.0f) : dry[c];
+            const float side=(sc && scChannels>0) ? clean(sc[std::min(c,scChannels-1)][n]) : 0.0f;
+            float x=dry[c]+(side-dry[c])*v[External];
             hpState[c]=flush(hpCoeff*hpState[c]+(1-hpCoeff)*x);
-            if(p[Highpass]>20.01f) x-=hpState[c];
+            x-=hpWet*hpState[c];
             lpState[c]=flush(lpCoeff*lpState[c]+(1-lpCoeff)*x);
-            if(p[Lowpass]<19999.0f) x=lpState[c];
+            x+=(lpState[c]-x)*lpWet;
             listen[c]=x;
             rms[c]=flush(rmsCoeff*rms[c]+(1-rmsCoeff)*x*x);
             // Crossfade detector modes to avoid a discontinuity on automation.

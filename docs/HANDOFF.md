@@ -4,7 +4,7 @@ Start with README, AGENTS, PRD, ARD and VALIDATION. Source of truth is the canon
 
 1. Confirm CI artifacts and inspect minimum/default-size GUI renders. Fix functional defects before adding styles.
 2. Run pluginval and two-host Windows tests (including ArSonMiX when available). Capture automation, sidechain and project-reload behavior.
-3. Listen and measure release/hold/filter transitions, bypass clicks and low-frequency distortion. Add regression cases for actual findings.
+3. Filter cutoff/endpoint activation and internal/external detector source now crossfade for 5 ms with regression probes; confirm perceptual quality in a host. Listen and measure release/hold transitions, bypass clicks and low-frequency distortion. Add regression cases for actual findings.
 4. Profile with GUI open/closed and many instances at 32/64/128 samples. Optimize only measured hotspots.
 5. Work toward Pro-C workflow/quality with documented independent models; never add fake style labels mapped to indistinguishable algorithms.
 

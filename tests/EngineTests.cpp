@@ -72,6 +72,38 @@ int main() {
         require(near(b.back(),0.01f),"unlinked low channel uncompressed");
     }
     {
+        // Live filter endpoint and source changes must not create one-sample
+        // steps in Listen SC. Compare the same waveform against an untouched
+        // engine rather than comparing unrelated consecutive waveform samples.
+        const auto transitionStep=[](Param control,float target) {
+            constexpr int n=4096;
+            Parameters p;p.value[Listen]=1;
+            Compressor changed,reference;changed.prepare(48000,p);reference.prepare(48000,p);
+            std::vector<float> a(n),b(n),side(n,-0.25f);
+            for(int i=0;i<n;++i)a[i]=b[i]=0.4f*std::sin(i*1.2f);
+            float* ap[]{a.data()},*bp[]{b.data()};const float* sp[]{side.data()};
+            changed.process(ap,1,n,sp,1);reference.process(bp,1,n,sp,1);
+            p.value[control]=target;changed.setParameters(p);
+            float x=0.4f*std::sin(n*1.2f),y=x,sc=-0.25f;
+            float* xp[]{&x},*yp[]{&y};const float* nextSc[]{&sc};
+            changed.process(xp,1,1,nextSc,1);reference.process(yp,1,1,nextSc,1);
+            return std::abs(x-y);
+        };
+        require(transitionStep(Highpass,200)<0.02f,"high-pass enable has no detector output step");
+        require(transitionStep(Lowpass,1000)<0.02f,"low-pass enable has no detector output step");
+        require(transitionStep(External,1)<0.02f,"external sidechain switch has no detector output step");
+
+        Parameters p;p.value[Listen]=1;
+        Compressor c;c.prepare(48000,p);
+        std::vector<float> audio(1024,0.25f),side(1024,-0.25f);
+        float* ap[]{audio.data()};const float* sp[]{side.data()};
+        c.process(ap,1,1024,sp,1);
+        p.value[External]=1;c.setParameters(p);
+        std::fill(audio.begin(),audio.end(),0.25f);
+        c.process(ap,1,1024,sp,1);
+        require(near(audio.back(),-0.25f,0.001f),"sidechain source reaches requested signal after ramp");
+    }
+    {
         Compressor c;Parameters p;for(auto& v:p.value)v=std::numeric_limits<float>::quiet_NaN();c.prepare(0,p);
         float a[]{std::numeric_limits<float>::infinity(),std::numeric_limits<float>::quiet_NaN(),1e-38f,1};float* ptr[]{a};c.process(ptr,1,4);
         for(auto v:a)require(std::isfinite(v),"invalid input contained");
