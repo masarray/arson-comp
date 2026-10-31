@@ -73,6 +73,7 @@ private:
     int currentChannels=2;
     juce::Rectangle<int> display;
     juce::Image grid,metalSurface; // cached full chassis and black glass LCD
+    juce::Image headerLogo; // cropped transparent metal/LED brand mark, decoded once
     juce::Path transferCurve,transferShade;
     juce::Path inputHistory,outputHistory,reductionHistory,reductionArea;
     // Six cached horizontal gradient brushes: input, output, GR, transfer,

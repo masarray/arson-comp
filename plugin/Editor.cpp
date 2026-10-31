@@ -245,6 +245,12 @@ void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
 Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.snapshot()) {
     setLookAndFeel(&look);
     setOpaque(true);
+    // One-time UI-thread decode of the approved ArSonComp chrome logo.
+    // Embedded via BinaryData: no runtime file I/O or audio impact.
+    headerLogo=juce::ImageFileFormat::loadFrom(
+        BinaryData::arsoncomp_header_logo_png,
+        static_cast<std::size_t>(BinaryData::arsoncomp_header_logo_pngSize));
+    jassert(headerLogo.isValid());
     const std::array<std::size_t,6> bars{{arson::Range,arson::Hold,arson::Mix,
         arson::Link,arson::Highpass,arson::Lowpass}};
     for(std::size_t i=0;i<knobs.size();++i) {
@@ -726,12 +732,17 @@ void Editor::paint(juce::Graphics& g) {
     g.drawHorizontalLine(1,0.0f,static_cast<float>(getWidth()));
     g.setColour(juce::Colours::black.withAlpha(0.58f));
     g.drawHorizontalLine(67,0.0f,static_cast<float>(getWidth()));
-    g.setFont(juce::FontOptions(17.5f));
-    g.setColour(text);
-    g.drawText("ArSon",16,11,73,28,juce::Justification::centredLeft);
-    g.setColour(accent);
-    g.drawText("Comp",84,11,61,28,juce::Justification::centredLeft);
-    g.fillRoundedRectangle(17.0f,49.0f,37.0f,2.0f,1.0f);
+    // Brushed chrome/bright-red title asset replaces the old split text.
+    // 131px viewport stops before MINI starts at x=147; keep its aspect ratio.
+    if(headerLogo.isValid()) {
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImageWithin(headerLogo,13,10,131,44,juce::RectanglePlacement::centred);
+    } else {
+        // Graceful fallback for missing/corrupt embedded resources.
+        g.setColour(text);
+        g.setFont(juce::FontOptions(17.0f));
+        g.drawText("ArSonComp",16,11,128,30,juce::Justification::centredLeft);
+    }
     g.setColour(text.withAlpha(0.73f));
     g.setFont(juce::FontOptions(9.0f));
     g.drawText("MODEL",198,5,84,13,juce::Justification::left);

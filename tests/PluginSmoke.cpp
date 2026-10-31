@@ -285,6 +285,24 @@ int main(int argc,char** argv) {
         if(countHue(render("Bypass",true),false)<70||
            countHue(render("Bypass",false),true)<70)return 58;
     }
+    // Product title is embedded RGBA with visible LED-red COMPRESSOR subtitle.
+    {
+        const auto logo=juce::ImageFileFormat::loadFrom(
+            BinaryData::arsoncomp_header_logo_png,
+            static_cast<std::size_t>(BinaryData::arsoncomp_header_logo_pngSize));
+        if(!logo.isValid()||logo.getWidth()!=256||logo.getHeight()!=55||
+           logo.getPixelAt(0,0).getFloatAlpha()>0.02f)return 59;
+        int glowingRed=0;
+        for(int y=29;y<55;++y)
+            for(int x=48;x<226;++x) {
+                const auto p=logo.getPixelAt(x,y);
+                if(p.getAlpha()>100 && p.getRed()>100 &&
+                   p.getRed()>p.getGreen()+30 &&
+                   p.getRed()>p.getBlue()+25)
+                    ++glowingRed;
+            }
+        if(glowingRed<100)return 60;
+    }
     // Cached chassis must be genuinely brushed grey, while the LCD
     // must remain deep black. Probe actual JUCE image rasterization after
     // the Graphics lifetime ends (Windows may defer image writes).
