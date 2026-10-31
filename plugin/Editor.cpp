@@ -321,6 +321,9 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         k.setComponentID("param."+juce::String(spec.id));
         k.onValueChange=[this,i] {
             if(hoveredParameter==i)updateHoverReadout(i);
+            if(i==arson::Threshold || i==arson::Ratio ||
+               i==arson::Knee || i==arson::Range)
+                graphCanvas.repaint();
         };
         juce::String shortLabel=juce::String(spec.name).toUpperCase();
         if(i==arson::Highpass) shortLabel="HP";
@@ -461,6 +464,7 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         }
     };
     addAndMakeVisible(compact);
+    addAndMakeVisible(graphCanvas);
     hoverReadout.setComponentID("view.value.readout");
     hoverReadout.setFont(juce::FontOptions(11.0f));
     hoverReadout.setColour(juce::Label::textColourId,accentBright);
@@ -473,7 +477,7 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     presets.setSelectedId(0,juce::dontSendNotification);
     presets.setText("Custom / restored",juce::dontSendNotification);
     setResizable(true,true);
-    setResizeLimits(860,700,1200,965);
+    setResizeLimits(740,585,1200,965);
     setSize(780,640);
     syncPanelVisibility();
     startTimerHz(30);
@@ -485,6 +489,33 @@ Editor::~Editor() {
         if(auto* parameter=processor.state.getParameter("threshold"))
             parameter->endChangeGesture();
     setLookAndFeel(nullptr);
+}
+void Editor::GraphCanvas::paint(juce::Graphics& g) {
+    if(owner.compactMode) {
+        if(owner.metalSurface.isValid())
+            g.drawImageAt(owner.metalSurface,-getX(),-getY());
+        else g.fillAll(juce::Colour{0xff0b1014});
+        juce::Graphics::ScopedSaveState saved(g);
+        g.setOrigin(-getX(),-getY());
+        owner.paintCompactMeters(g);
+    } else {
+        if(owner.grid.isValid())g.drawImageAt(owner.grid,0,0);
+        else g.fillAll(juce::Colour{0xff070b0d});
+        owner.drawDisplay(g);
+    }
+}
+void Editor::GraphCanvas::mouseDown(const juce::MouseEvent& e) {
+    owner.mouseDown(e.getEventRelativeTo(&owner));
+}
+void Editor::GraphCanvas::mouseDrag(const juce::MouseEvent& e) {
+    owner.mouseDrag(e.getEventRelativeTo(&owner));
+}
+void Editor::GraphCanvas::mouseUp(const juce::MouseEvent& e) {
+    owner.mouseUp(e.getEventRelativeTo(&owner));
+}
+void Editor::GraphCanvas::mouseMove(const juce::MouseEvent& e) {
+    owner.mouseMove(e.getEventRelativeTo(&owner));
+    setMouseCursor(owner.getMouseCursor());
 }
 void Editor::setValue(std::size_t i,float value) {
     if(auto* parameter=processor.state.getParameter(arson::specs[i].id)) {
@@ -601,6 +632,8 @@ void Editor::resized() {
     external.setBounds(detX+detW+8,bottomY+42,extW,30);
     listen.setBounds(detX+detW+extW+16,bottomY+42,listenW,30);
     const int readoutW=juce::jmin(254,w-40);
+    graphCanvas.setBounds(compactMode
+        ? juce::Rectangle<int>{13,258,w-26,47} : display);
     hoverReadout.setBounds(compactMode?w-readoutW-14:
         display.getCentreX()-readoutW/2,
         compactMode?h-21:display.getBottom()-27,readoutW,18);
@@ -703,6 +736,8 @@ void Editor::timerCallback() {
             outPeaks[i]=std::max(outPeaks[i],frame.outputChannel[i]);
         }
     }
+    const auto previousInput=inputDb,previousOutput=outputDb,previousGr=gr;
+    const auto previousInChannels=inChannelDb,previousOutChannels=outChannelDb;
     // Time-based visual smoothing: attack remains responsive (~18 ms) while
     // falloff is calm (~210 ms). No change to real detector or DSP latency.
     const double now=juce::Time::getMillisecondCounterHiRes();
@@ -730,8 +765,14 @@ void Editor::timerCallback() {
             std::max(1,static_cast<int>(std::round(elapsed*100.0))));
     }
     if(!compactMode && (received>0 || aged>0))rebuildHistoryPaths();
-    if(compactMode)repaint(14,298,getWidth()-28,57);
-    else repaint(display);
+    bool meterChanged=std::abs(inputDb-previousInput)>0.03f ||
+        std::abs(outputDb-previousOutput)>0.03f ||
+        std::abs(gr-previousGr)>0.015f;
+    for(std::size_t i=0;i<2;++i)
+        meterChanged=meterChanged ||
+            std::abs(inChannelDb[i]-previousInChannels[i])>0.03f ||
+            std::abs(outChannelDb[i]-previousOutChannels[i])>0.03f;
+    if(received>0 || aged>0 || meterChanged)graphCanvas.repaint();
 }
 
 void Editor::rebuildHistoryPaths() {
@@ -831,10 +872,7 @@ void Editor::paint(juce::Graphics& g) {
     g.setColour(accent.withAlpha(0.68f));
     g.fillRoundedRectangle(sidechainPanel?115.0f:17.0f,
         static_cast<float>(bottomY+22),sidechainPanel?91.0f:88.0f,1.8f,1.0f);
-    if(!compactMode) {
-        if(grid.isValid())g.drawImageAt(grid,display.getX(),display.getY());
-        drawDisplay(g);
-    } else paintCompactMeters(g);
+    // Cached chassis/header are static; the live LCD is an opaque child.
     g.setColour(text.withAlpha(0.66f));
     g.setFont(juce::FontOptions(9.0f));
     g.drawText("0 SAMPLES ADDED / REALTIME DSP",
@@ -901,8 +939,8 @@ void Editor::drawMeter(juce::Graphics& g,juce::Rectangle<float> bounds,
 }
 void Editor::drawDisplay(juce::Graphics& g) {
     juce::Graphics::ScopedSaveState save(g);
-    g.reduceClipRegion(display);
-    g.setOrigin(display.getPosition());
+    g.reduceClipRegion(juce::Rectangle<int>{0,0,
+        display.getWidth(),display.getHeight()});
     const auto plot=plotBounds().translated(-static_cast<float>(display.getX()),
                                              -static_cast<float>(display.getY()));
     if(plot.isEmpty())return;
@@ -1044,7 +1082,7 @@ void Editor::mouseDrag(const juce::MouseEvent& event) {
         parameter->setValueNotifyingHost(parameter->convertTo0to1(threshold));
     hoveredParameter=arson::Threshold;
     updateHoverReadout(hoveredParameter);
-    repaint(display);
+    graphCanvas.repaint();
 }
 void Editor::mouseUp(const juce::MouseEvent&) {
     if(!thresholdDragging)return;

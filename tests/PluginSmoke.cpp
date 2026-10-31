@@ -423,6 +423,12 @@ int main(int argc,char** argv) {
             // No floating tooltip obscures the hardware control strip.
             if(!slider->getTooltip().isEmpty())return 49;
         }
+        // Opaque live meter canvas isolates timer repaints from chassis.
+        auto* canvas=editor->findChildWithID("view.graph.canvas");
+        const auto expectedCanvas=juce::Rectangle<int>{
+            8,70,editor->getWidth()-16,editor->getHeight()-268};
+        if(!canvas || !canvas->isVisible() || !canvas->isOpaque() ||
+           canvas->getBounds()!=expectedCanvas)return 70;
         auto* readout=dynamic_cast<juce::Label*>(
             editor->findChildWithID("view.value.readout"));
         if(!readout || !readout->isVisible() ||
@@ -562,6 +568,8 @@ int main(int argc,char** argv) {
             if(!mini || !mini->onClick)return 10;
             mini->onClick();
             if(editor->getHeight()!=330)return 11;
+            if(canvas->getBounds()!=juce::Rectangle<int>{
+                13,258,editor->getWidth()-26,47})return 71;
             auto compactImage=editor->createComponentSnapshot(editor->getLocalBounds());
             if(compactImage.isNull() || compactImage.getHeight()!=330)return 12;
             if(argc>1) {
@@ -572,6 +580,9 @@ int main(int argc,char** argv) {
             }
             mini->onClick();
             if(editor->getHeight()!=640)return 14;
+            if(canvas->getBounds()!=juce::Rectangle<int>{
+                8,70,editor->getWidth()-16,editor->getHeight()-268})
+                return 72;
         }
         auto image=editor->createComponentSnapshot(editor->getLocalBounds());
         if(image.isNull())return 3;
