@@ -33,3 +33,7 @@ References: https://steinbergmedia.github.io/vst3_dev_portal/pages/FAQ/Processin
 https://www.fabfilter.com/help/pro-c/using/styleandcharacter
 https://www.fabfilter.com/help/pro-c/using/oversampling
 https://www.fabfilter.com/help/pro-c/using/overview
+
+## M2 implemented CPU-work avoidance (no sonic approximation)
+
+The current M2 engine patch adds a bounded active-ramp index list recomputed once per host block. When controls are stationary, the sample loop performs **no parameter ramp iterations**; active automation continues sample-by-sample using the original ramp math. The static lower-knee threshold is preconverted to linear once per block; samples definitely below the soft knee skip the log10 gain-computer conversion. Exact zero gain reduction skips exp(0). All three changes preserve the original compression law, sample-clock semantics, zero additional samples and existing state schema. When Threshold/Knee are moving, the linear-domain shortcut is disabled to preserve automation. Stereo + RMS/Peak + all three models, 44.1-192kHz, block partition invariance, multi-instance finite output and no heap allocations are validated in engine tests. Win/Linux CI is the gate; hardware audio stability still requires measurements.
