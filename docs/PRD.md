@@ -18,3 +18,9 @@ Listen with vocals, music, transients and low-frequency tones. Compare loudness-
 ## Benchmark reference alignment — Pro-C 3, October 2026
 
 The current publicly documented FabFilter Pro-C 3 has 14 styles, optional analog Character, multiple-band detector EQ, Auto Threshold/Gain, surround and optional lookahead/oversampling (see https://www.fabfilter.com/help/pro-c). ArSonComp **does not claim parity** with these features: its three causal models, one-pole HP/LP detector filters and zero-added-sample live path are currently deliberate smaller-scope choices. Prioritize host routing/state/bypass reliability and matched listening before adding analog color or additional topologies. Avoid retrofitting lookahead/oversampling into the zero-latency default; an optional latency-incurring mode would require explicit host compensation and separate acceptance.
+
+## Milestone reconciliation — 2026-10-31
+
+The initial implementation acceptance is **met in automated testing** at code commit `7b340eb2`: C++17 causal DSP with zero added algorithmic samples, Windows VST3/Standalone packaging, APVTS state/preset/automation paths, external sidechain and bypass regressions, both Linux/Windows CI jobs green, and actual Windows GUI screenshots. The compact editor now defaults to **780×640** (minimum **740×585**, MINI height **330**). Hardware-style metal toggle/slider assets and black-glass LCD remain; control values are read from a **single footer label**, not floating popup/tooltip overlays.
+
+**Acceptance deliberately incomplete for production:** pluginval, two independent host applications, a real audio interface, long-session CPU/dropout measurement, 32/64/128 sample buffer tests, host project restore and sidechain automation in the field, DPI scaling, and reference listening. Merging code into `main` establishes a testable engineering baseline only, not a public production release or FabFilter parity.

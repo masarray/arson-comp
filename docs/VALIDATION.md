@@ -1,5 +1,7 @@
 # Validation record
 
+> **Latest verified baseline (2026-10-31):** Both Windows build/editor-smoke/benchmark/artifact and Linux engine-safety passed for source commit `7b340eb2ee5740df13b52b5bfcf984a3b66d0dd3`, [Actions #41202549812](https://github.com/masarray/arson-comp/actions/runs/41202549812). The Windows artifact includes full 780×640, minimum 740×585, sidechain 740×585, and MINI 780×330 actual JUCE screenshots. Static layout/asset/value-readout tests passed. Older pending-CI descriptions below are historical milestones, **not** the latest result. Real DAW/device/pluginval tests remain pending.\n
+
 Initial implementation, 2026-10-31.
 
 Local GCC 13.3 Release engine tests pass: static ratio and knee curves, monotonicity/continuity/range, attack time constants at 44.1/48/96/192 kHz, release time constant, hold duration and adaptive recovery, steady reduction, zero-delay unity impulse, bypass and dry transparency, arbitrary-block partition equivalence, external mono sidechain to stereo, linked/unlinked channels, disconnected sidechain, non-finite containment, zero allocations over 10,000 parameter-update/process blocks, bounded queue saturation and 100,000-frame threaded SPSC order.
@@ -75,3 +77,17 @@ Verify default 1120x760, minimum 960x670 and compact 380px Windows screenshot ge
 - GUI 900×765, minimum 860×700, SIDECHAIN 860×700, MINI 900×380: Range/Hold/Mix/Link and HP/LP each render the same plate and moving thumb. No labels/tabs collide.
 - Smoke: independent transparent PNGs must decode via built-in BinaryData at 340×57 / 58×124; actual JUCE L&F slider raster at min/mid/max must show an increase of red channel at x=61 along the groove and measurable pixel-change where the thumb moves. Existing preset, automation, stereo+mono sidechain, host bypass, 32/64/128 samples, sanitizer and zero DSP added latency tests remain mandatory.
 - Host/device latency and Pro-C audio parity are NOT implied by visual CI.
+
+## Reconciled final engineering-test gate — 2026-10-31
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Linux sanitizer/engine-safety | Actions #41202549812, engine-safety job | PASS |
+| Windows VST3/Standalone Release | Actions #41202549812, windows build job | PASS |
+| CTest engine_contract/plugin_state_editor | Same windows job (including 32/64/128 sidechain/host-bypass probes) | PASS |
+| Matched PNG resource decode and deterministic overlay | GUI smoke test plus Windows screenshot pack | PASS |
+| Full/minimum/SIDECHAIN/MINI visible layout | 780×640, 740×585, 740×585, 780×330 screenshots | PASS (static CI checks) |
+| No obstructing tooltip; LCD parameter-value readout | GUI editor state/value update check, `view.value.readout` | PASS (automated) |
+| Real host ASIO/WASAPI, long run, pluginval, Pro-C comparison | No physical test evidence | **PENDING** |
+
+This code is suitable to merge as an **engineering baseline**, not to label as physically validated. Avoid using legacy screenshots at 900×765 or 1120×760 for this milestone. Historical smoke assumptions about 82-px knobs, JUCE popup bubbles, or original slider thumb are superseded by 70-px primary component height, footer readout, and dual-image gunmetal track/thumb.

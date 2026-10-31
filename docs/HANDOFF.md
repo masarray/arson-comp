@@ -1,5 +1,16 @@
 # Handoff
 
+## Current engineering baseline — reconciled 2026-10-31
+
+- **Source gate:** 34 commits on PR #1, last code-tested SHA `7b340eb2ee5740df13b52b5bfcf984a3b66d0dd3`. Windows VST3/Standalone build, CTest and Linux engine-safety **PASS** in [Actions #41202549812](https://github.com/masarray/arson-comp/actions/runs/41202549812). Windows artifact [#13043510391](https://github.com/masarray/arson-comp/actions/runs/41202549812/artifacts/13043510391) includes four actual editor screenshots.
+- **Current UI, not old mockup:** default 780×640, min 740×585, MINI 330px; black glass LCD, brushed grey chassis; separate gunmetal slider track/overlay thumb + red rail level, matched red/green toggle PNG pair, photo-metal knobs and animated stereo IN/GR/OUT.
+- **Hover/readout:** tooltip popups removed. Knob or slider hover/drag updates a small stationary readout on the bottom of the main LCD, MINI footer on right; host parameter IDs unchanged. Sidechain panel is responsive.
+- **Merge meaning:** merge into `main` records an engineering test baseline; it does **not** declare a shipping release. Preserve evidence in docs/VALIDATION.md and do not claim real device ASIO, pluginval or Pro-C parity.
+- **Next significant milestone:** physical Windows host/standalone acceptance on audio interface; load VST3 in at least two hosts, verify 32/64/128 buffers and mono/stereo external SC, bypass, preset/project recall, automation, MINI/FULL, readout hover, 150% DPI and sustained multiple instances; capture audible/CPU/latency results, then evaluate matched reference listening.
+
+### Historical milestone log follows (earlier sizes/popups/CI states are superseded)
+
+
 Start with README, AGENTS, PRD, ARD and VALIDATION. Source of truth is the canonical parameter table, not UI strings. The current milestone delivers a complete first compressor path and UI with explicit release gates; it is not the final parity milestone.
 
 1. This milestone adds three distinct causal models (Clean feed-forward, Feedback, Smooth dual-pole) and a redesigned meter/transfer-centric GUI, without adding samples of latency. Next batch optimizes unchanged host snapshots and Peak RMS meter CPU, adds direct transfer-marker threshold editing with one automation gesture and a fully reflowed 380 px vintage compact GUI. Smoke screenshots now cover default, minimum and compact sizes; visually inspect all three in Windows artifacts. Confirm the new CI artifact and visually inspect minimum/default-size GUI PNGs. Review labels, overlap and readability in real Windows scaling.
