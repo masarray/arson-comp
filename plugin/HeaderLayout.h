@@ -29,7 +29,7 @@ struct HeaderLayout {
         // One-row responsive grid with a compact logo and right-anchored
         // actions, so long preset names remain accessible via the browser.
         constexpr int inset=10,gap=6;
-        constexpr int logoW=100,miniW=38,modelW=86;
+        constexpr int logoW=88,miniW=50,modelW=86;
         constexpr int compareW=38,fileW=38,bypassW=100;
         constexpr int fixed=logoW+miniW+modelW+compareW+fileW+bypassW;
         const int available=width-2*inset-6*gap-fixed;
