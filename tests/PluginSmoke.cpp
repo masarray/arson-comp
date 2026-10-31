@@ -206,15 +206,15 @@ int main(int argc,char** argv) {
         editor->setSize(iteration%2 ? 860 : 900,iteration%2 ? 700 : 765);
         if(editor->getWidth()!=(iteration%2 ? 860 : 900) ||
            editor->getHeight()!=(iteration%2 ? 700 : 765))return 9;
-        const auto* threshold=editor->findChildWithID("param.threshold");
-        const auto* input=editor->findChildWithID("param.input");
-        const auto* ratio=editor->findChildWithID("param.ratio");
-        const auto* attack=editor->findChildWithID("param.attack");
+        auto* threshold=editor->findChildWithID("param.threshold");
+        auto* input=editor->findChildWithID("param.input");
+        auto* ratio=editor->findChildWithID("param.ratio");
+        auto* attack=editor->findChildWithID("param.attack");
         if(!threshold || !input || !ratio || !attack ||
            !(input->getX()<attack->getX() && attack->getX()<threshold->getX() &&
              threshold->getX()<ratio->getX()))return 19;
-        for(const auto* candidate : {threshold,input,ratio,attack}) {
-            const auto* slider=dynamic_cast<const juce::Slider*>(candidate);
+        for(auto* candidate : {threshold,input,ratio,attack}) {
+            auto* slider=dynamic_cast<juce::Slider*>(candidate);
             if(!slider || slider->getTextBoxPosition()!=juce::Slider::NoTextBox)
                 return 48;
             // Value remains available by accessible popup/tooltips even
