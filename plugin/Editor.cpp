@@ -38,6 +38,10 @@ CompLook::CompLook() {
         BinaryData::black_brushed_knob_jpg,
         static_cast<std::size_t>(BinaryData::black_brushed_knob_jpgSize));
     jassert(sourceFace.isValid());
+    sliderThumb=juce::ImageFileFormat::loadFrom(
+        BinaryData::PAN_SLIDER_png,
+        static_cast<std::size_t>(BinaryData::PAN_SLIDER_pngSize));
+    jassert(sliderThumb.isValid());
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colour{0xff31383e});
@@ -90,74 +94,104 @@ void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float start,float end,juce::Slider& slider) {
     const bool primary=slider.getName()=="Threshold";
     const float r=std::max(13.0f,std::min(
-        static_cast<float>(w)*(primary?0.455f:0.395f),
-        static_cast<float>(h)*(primary?0.455f:0.395f)));
+        static_cast<float>(w)*(primary?0.400f:0.385f),
+        static_cast<float>(h)*(primary?0.400f:0.385f)));
     const int pixels=juce::jmax(28,static_cast<int>(std::ceil(r*2.0f+7.0f)));
-    const float cx=x+w*0.5f,cy=y+h*0.48f;
+    const float cx=x+w*0.5f,cy=y+h*0.50f;
+    const float angle=start+clamp01(pos)*(end-start);
+    const float bodyRadius=pixels*0.5f;
+    // Draw the level RING FIRST. Its radius is larger than the black metal
+    // photograph, so the dial occludes the inner arc naturally, as a physical
+    // knob would. Nothing gets painted on top of the metal except the dot.
+    const float trackRadius=bodyRadius+2.2f;
+    juce::Path inactive,active;
+    inactive.addCentredArc(cx,cy,trackRadius,trackRadius,0.0f,start,end,true);
+    active.addCentredArc(cx,cy,trackRadius,trackRadius,0.0f,start,angle,true);
+    g.setColour(juce::Colour{0xff42474b}.withAlpha(0.92f));
+    g.strokePath(inactive,juce::PathStrokeType(5.2f,
+        juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
+    g.setColour(accentBright.withAlpha(0.98f));
+    g.strokePath(active,juce::PathStrokeType(primary?5.2f:4.7f,
+        juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
+    // Cached source face never gets recomputed during drag or telemetry paint.
     const auto& face=knobFace(pixels,primary);
-    g.drawImageAt(face,juce::roundToInt(cx-pixels*0.5f),
-                       juce::roundToInt(cy-pixels*0.5f));
-    // Active arc lies inside the dark metal groove in the reference,
-    // with no thick neon ring floating outside the physical control.
-    const float groove=r-4.7f;
-    const float valueAngle=start+clamp01(pos)*(end-start);
-    juce::Path activity;
-    activity.addCentredArc(cx,cy,groove,groove,0.0f,start,valueAngle,true);
-    g.setColour(accent.withAlpha(0.23f));
-    g.strokePath(activity,juce::PathStrokeType(6.0f,
-        juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
-    g.setColour(accentBright.withAlpha(0.95f));
-    g.strokePath(activity,juce::PathStrokeType(primary?4.1f:3.5f,
-        juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
-    // On-face calibrated needle. Small and restrained.
-    const float faceRadius=r-14.5f;
-    g.setColour(juce::Colour{0xfff1f0ed}.withAlpha(0.9f));
-    g.drawLine(cx+std::sin(valueAngle)*faceRadius*0.37f,
-               cy-std::cos(valueAngle)*faceRadius*0.37f,
-               cx+std::sin(valueAngle)*faceRadius*0.73f,
-               cy-std::cos(valueAngle)*faceRadius*0.73f,1.65f);
-    g.setColour(juce::Colour{0xffd0cfcd}.withAlpha(0.55f));
-    g.fillEllipse(cx-1.4f,cy-1.4f,2.8f,2.8f);
+    g.drawImageAt(face,juce::roundToInt(cx-bodyRadius),
+                       juce::roundToInt(cy-bodyRadius));
+    // Red positioning dot at 79% of the actual knob radius, near the rim.
+    // A tiny dark bezel keeps it readable on specular metal highlights.
+    const float dotRadius=bodyRadius*0.79f;
+    const float dx=cx+std::sin(angle)*dotRadius;
+    const float dy=cy-std::cos(angle)*dotRadius;
+    g.setColour(juce::Colour{0xff0a0e11}.withAlpha(0.88f));
+    g.fillEllipse(dx-4.0f,dy-4.0f,8.0f,8.0f);
+    g.setColour(accentBright);
+    g.fillEllipse(dx-2.75f,dy-2.75f,5.5f,5.5f);
+    g.setColour(juce::Colours::white.withAlpha(0.40f));
+    g.fillEllipse(dx-1.25f,dy-1.6f,1.5f,1.5f);
 }
-
 void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float,float,
                                  const juce::Slider::SliderStyle,juce::Slider&) {
-    const float left=static_cast<float>(x)+9, right=static_cast<float>(x+w)-9;
+    const float left=static_cast<float>(x)+9.0f;
+    const float right=static_cast<float>(x+w)-9.0f;
     const float cy=static_cast<float>(y)+h*0.51f;
-    g.setColour(juce::Colour{0xff3d444a});
-    g.fillRoundedRectangle(left,cy-3,right-left,6,3);
-    g.setColour(juce::Colour{0xffe33c49});
     const float end=juce::jlimit(left,right,pos);
-    if(end>left)g.fillRoundedRectangle(left,cy-3,end-left,6,3);
-    g.setColour(juce::Colour{0xffff7380});
-    g.fillEllipse(end-5.0f,cy-5.0f,10.0f,10.0f);
+    g.setColour(juce::Colour{0xff373f46});
+    g.fillRoundedRectangle(left,cy-2.3f,right-left,4.6f,2.3f);
+    g.setColour(accent.withAlpha(0.84f));
+    if(end>left)g.fillRoundedRectangle(left,cy-2.3f,end-left,4.6f,2.3f);
+    // Scale supplied 18x40 transparent PNG to a restrained 10x22 track cap.
+    // Image is decoded once when LookAndFeel is constructed.
+    if(sliderThumb.isValid()) {
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImage(sliderThumb,
+            juce::Rectangle<float>{end-5.5f,cy-11.0f,11.0f,22.0f});
+    } else {
+        g.setColour(accentBright);
+        g.fillRoundedRectangle(end-3.5f,cy-8.0f,7.0f,16.0f,3.0f);
+    }
 }
-
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
                                  bool highlighted,bool down) {
-    if(button.getButtonText()!="Bypass") {
-        juce::LookAndFeel_V4::drawToggleButton(g,button,highlighted,down);
-        return;
+    const bool header=button.getButtonText()=="Bypass";
+    const bool checked=button.getToggleState();
+    // Bypass is semantically inverted: bypass=false means ACTIVE.
+    const bool enabled=header?!checked:checked;
+    const float trackW=header?33.0f:32.0f;
+    const float trackH=header?16.0f:15.0f;
+    const float tx=header?9.0f:(button.getWidth()-trackW)*0.5f;
+    const float ty=header?(button.getHeight()-trackH)*0.5f:1.0f;
+    const auto track=juce::Rectangle<float>(tx,ty,trackW,trackH);
+    g.setColour(enabled?juce::Colour{0xff543039}:juce::Colour{0xff282e34});
+    g.fillRoundedRectangle(track,trackH*0.5f);
+    g.setColour(enabled?accent.withAlpha(0.70f):
+        juce::Colour{0xff545b63}.withAlpha(0.75f));
+    g.drawRoundedRectangle(track,trackH*0.5f,0.85f);
+    const float centerY=ty+trackH*0.5f;
+    const float knobR=trackH*0.5f-2.3f;
+    const float centerX=enabled?tx+trackW-trackH*0.5f:tx+trackH*0.5f;
+    g.setColour(enabled?juce::Colour{0xffff8d94}:juce::Colour{0xffb0b7bd});
+    g.fillEllipse(centerX-knobR,centerY-knobR,knobR*2,knobR*2);
+    const juce::String caption=header?(enabled?"ACTIVE":"BYPASS"):
+        button.getButtonText();
+    g.setColour(enabled?juce::Colour{0xffe5e5e5}:juce::Colour{0xff9aa3aa});
+    if(header) {
+        // One-line caption centred in its own allocated header region.
+        g.setFont(juce::FontOptions(10.4f));
+        g.drawText(caption,47,0,button.getWidth()-51,button.getHeight(),
+            juce::Justification::centredLeft,false);
+    } else {
+        g.setFont(juce::FontOptions(9.0f));
+        g.drawText(caption,0,track.getBottom()+2.0f,button.getWidth(),
+            std::max(11.0f,static_cast<float>(button.getHeight())-track.getBottom()-2.0f),
+            juce::Justification::centred,false);
     }
-    const bool on=button.getToggleState();
-    const auto box=button.getLocalBounds().toFloat().reduced(2.0f);
-    g.setColour(on?juce::Colour{0xff3d2027}:juce::Colour{0xff1b2026});
-    g.fillRoundedRectangle(box,5.0f);
-    g.setColour(on?accent.withAlpha(0.8f):line);
-    g.drawRoundedRectangle(box,5.0f,0.9f);
-    const float cx=box.getX()+19.0f,cy=box.getCentreY();
-    juce::Path ring;
-    ring.addCentredArc(cx,cy,9.5f,9.5f,0.0f,0.63f,5.65f,true);
-    g.setColour(on?accentBright:muted);
-    g.strokePath(ring,juce::PathStrokeType(2.2f));
-    g.drawLine(cx,cy-13.0f,cx,cy-1.0f,2.2f);
-    g.setColour(on?accentBright:text);
-    g.setFont(juce::FontOptions(11.0f));
-    g.drawText(on?"BYPASS":"ACTIVE",33,0,box.getWidth()-35,
-        button.getHeight(),juce::Justification::centredLeft);
+    if(highlighted||down) {
+        g.setColour(accent.withAlpha(down?0.35f:0.17f));
+        g.drawRoundedRectangle(track.expanded(1.5f),trackH*0.5f,0.7f);
+    }
 }
-
+juce::Font CompLook::getSliderPopupFont(juce::Slider&) { return juce::Font(juce::FontOptions(12.5f)); }
 void CompLook::drawTooltip(juce::Graphics& g,const juce::String& value,int w,int h) {
     const auto r=juce::Rectangle<float>(1.0f,1.0f,static_cast<float>(w-2),static_cast<float>(h-2));
     g.setColour(juce::Colours::black.withAlpha(0.22f));
@@ -185,14 +219,28 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         k.setLookAndFeel(&look);
         k.setSliderStyle(std::find(bars.begin(),bars.end(),i)!=bars.end()
             ? juce::Slider::LinearHorizontal : juce::Slider::RotaryHorizontalVerticalDrag);
-        k.setTextBoxStyle(juce::Slider::TextBoxBelow,false,96,20);
+        // Numeric values live in on-hover/on-drag value popups; no row of
+        // boxed numbers cluttering the control surface.
+        k.setTextBoxStyle(juce::Slider::NoTextBox,false,0,0);
+        k.setPopupDisplayEnabled(true,false,this);
         k.setTextValueSuffix(spec.unit);
         k.setNumDecimalPlacesToDisplay(i==arson::Attack || i==arson::Ratio ? 2 : 1);
         k.setDoubleClickReturnValue(true,spec.initial);
         k.setScrollWheelEnabled(false);
         k.setName(spec.name);
         k.setComponentID("param."+juce::String(spec.id));
-        k.setTooltip(juce::String(spec.name)+": drag to change; double click resets; type exact values.");
+        const auto describe=[this,i] {
+            const auto& s=arson::specs[i];
+            auto& slider=knobs[i];
+            const int decimals=(i==arson::Ratio || i==arson::Attack)?2:1;
+            const juce::String value=(i==arson::Highpass || i==arson::Lowpass)
+                ? juce::String(juce::roundToInt(slider.getValue()))
+                : juce::String(slider.getValue(),decimals);
+            slider.setTooltip(juce::String(s.name)+": "+value+juce::String(s.unit)+
+                "  |  Drag to adjust · double-click to reset");
+        };
+        k.onValueChange=describe;
+        describe();
         juce::String shortLabel=juce::String(spec.name).toUpperCase();
         if(i==arson::Highpass) shortLabel="HP";
         if(i==arson::Lowpass) shortLabel="LP";

@@ -11,10 +11,12 @@ public:
                           const juce::Slider::SliderStyle,juce::Slider&) override;
     void drawToggleButton(juce::Graphics&,juce::ToggleButton&,bool,bool) override;
     void drawTooltip(juce::Graphics&,const juce::String&,int,int) override;
+    juce::Font getSliderPopupFont(juce::Slider&) override;
 private:
     struct FaceCache { int pixels=0; juce::Image face; };
     std::array<FaceCache,2> faces; // normal + oversized Threshold only
     juce::Image sourceFace; // decoded once on GUI initialization
+    juce::Image sliderThumb; // supplied PAN-SLIDER.png, decoded once
     const juce::Image& knobFace(int diameter,bool primary);
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {
@@ -41,7 +43,7 @@ private:
     void syncPanelVisibility();
     Processor& processor;
     CompLook look;
-    juce::TooltipWindow tooltip{this,650};
+    juce::TooltipWindow tooltip{this,220};
     std::array<juce::Slider,arson::Detector> knobs;
     std::array<juce::Label,arson::Detector> labels;
     using SliderAttachment=juce::AudioProcessorValueTreeState::SliderAttachment;

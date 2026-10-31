@@ -79,17 +79,21 @@ int main(int argc,char** argv) {
         if(base.getPixelAt(48,48).getBrightness()<0.08f ||
            base.getPixelAt(48,48).getBrightness()>0.90f)return 34;
     }
+    const auto failHost=[](int code) {
+        std::cerr<<"HOST_BUS_INTEGRATION_FAILED "<<code<<'\n';
+        return code;
+    };
     // True JUCE bus-routing contract: test the processor entrypoint, not
     // just the DSP engine, using 2 main channels and a host mono SC bus.
     // Covers 32/64/128-frame hardware-like blocks and host bypass.
     for(const int blockSize : {32,64,128}) {
         Processor live;
         auto buses=live.getBusesLayout();
-        if(buses.inputBuses.size()<2) return 35;
+        if(buses.inputBuses.size()<2) return failHost(35);
         buses.inputBuses.set(1,juce::AudioChannelSet::mono());
         if(!live.setBusesLayout(buses) ||
            live.getTotalNumInputChannels()!=3 ||
-           live.getTotalNumOutputChannels()!=2)return 36;
+           live.getTotalNumOutputChannels()!=2)return failHost(36);
         live.prepareToPlay(48000.0,blockSize);
         auto set=[&](const char* id,float value) {
             auto* parameter=live.state.getParameter(id);
@@ -98,7 +102,7 @@ int main(int argc,char** argv) {
             return true;
         };
         if(!set("threshold",-20.0f)||!set("ratio",4.0f)||
-           !set("knee",0.0f)||!set("external",1.0f))return 37;
+           !set("knee",0.0f)||!set("external",1.0f))return failHost(37);
 
         juce::AudioBuffer<float> signal(3,blockSize);
         juce::MidiBuffer midi;
@@ -116,23 +120,30 @@ int main(int argc,char** argv) {
         const float gain=arson::dbToGain(-15.0f);
         if(std::abs(signal.getSample(0,blockSize-1)-0.05f*gain)>0.002f ||
            std::abs(signal.getSample(1,blockSize-1)-0.025f*gain)>0.002f ||
-           signal.getSample(2,blockSize-1)!=1.0f)return 38;
+           signal.getSample(2,blockSize-1)!=1.0f) {
+            std::cerr<<"sidechain output @"<<blockSize<<" frames "
+                <<signal.getSample(0,blockSize-1)<<", "
+                <<signal.getSample(1,blockSize-1)<<", side="
+                <<signal.getSample(2,blockSize-1)<<" expectedGain="
+                <<gain<<'\n';
+            return failHost(38);
+        }
 
         // The sidechain is still physically present; switching to internal
         // detection must recover naturally without rewiring the host buffer.
-        if(!set("external",0.0f))return 39;
+        if(!set("external",0.0f))return failHost(39);
         for(int b=0;b<warmup;++b)process(false);
         if(std::abs(signal.getSample(0,blockSize-1)-0.05f)>0.002f ||
-           std::abs(signal.getSample(1,blockSize-1)-0.025f)>0.002f)return 40;
+           std::abs(signal.getSample(1,blockSize-1)-0.025f)>0.002f)return failHost(40);
 
         // Host bypass path must ignore Input/Makeup and output the exact
         // input waveform after the finite click-avoidance transition.
-        if(!set("input",12.0f)||!set("makeup",12.0f))return 41;
+        if(!set("input",12.0f)||!set("makeup",12.0f))return failHost(41);
         for(int b=0;b<12;++b)process(true);
         if(std::abs(signal.getSample(0,blockSize-1)-0.05f)>1.0e-5f ||
            std::abs(signal.getSample(1,blockSize-1)-0.025f)>1.0e-5f)
-            return 42;
-        if(live.getLatencySamples()!=0)return 43;
+            return failHost(42);
+        if(live.getLatencySamples()!=0)return failHost(43);
     }
     {
         // The optional SC bus must not break mono, sidechain-disabled
@@ -142,17 +153,27 @@ int main(int argc,char** argv) {
         buses.inputBuses.set(0,juce::AudioChannelSet::mono());
         buses.outputBuses.set(0,juce::AudioChannelSet::mono());
         if(!mono.setBusesLayout(buses) || mono.getTotalNumInputChannels()!=1)
-            return 44;
+            return failHost(44);
         mono.prepareToPlay(48000,32);
         auto* unity=mono.state.getParameter("ratio");
-        if(!unity)return 45;
+        if(!unity)return failHost(45);
         unity->setValueNotifyingHost(unity->convertTo0to1(1.0f));
         juce::AudioBuffer<float> audio(1,32);
         juce::MidiBuffer midi;
         for(int i=0;i<32;++i)audio.setSample(0,i,0.123f);
         mono.processBlock(audio,midi);
         if(std::abs(audio.getSample(0,0)-0.123f)>1.0e-6f ||
-           std::abs(audio.getSample(0,31)-0.123f)>1.0e-6f)return 46;
+           std::abs(audio.getSample(0,31)-0.123f)>1.0e-6f)return failHost(46);
+    }
+    // Validate the supplied transparent PAN-SLIDER asset is embedded in
+    // JUCE BinaryData and will not require an external install path.
+    {
+        const auto image=juce::ImageFileFormat::loadFrom(
+            BinaryData::PAN_SLIDER_png,
+            static_cast<std::size_t>(BinaryData::PAN_SLIDER_pngSize));
+        if(!image.isValid() || image.getWidth()!=18 || image.getHeight()!=40 ||
+           image.getPixelAt(0,0).getFloatAlpha()>0.01f ||
+           image.getPixelAt(9,20).getFloatAlpha()<0.9f) return 47;
     }
     Processor processor;processor.prepareToPlay(48000,128);
     if(processor.getLatencySamples()!=0) return 1;
@@ -192,6 +213,14 @@ int main(int argc,char** argv) {
         if(!threshold || !input || !ratio || !attack ||
            !(input->getX()<attack->getX() && attack->getX()<threshold->getX() &&
              threshold->getX()<ratio->getX()))return 19;
+        for(const auto* candidate : {threshold,input,ratio,attack}) {
+            const auto* slider=dynamic_cast<const juce::Slider*>(candidate);
+            if(!slider || slider->getTextBoxStyle()!=juce::Slider::NoTextBox)
+                return 48;
+            // Value remains available by accessible popup/tooltips even
+            // though boxed numeric labels no longer crowd the control strip.
+            if(slider->getTooltip().isEmpty())return 49;
+        }
         if(threshold->getBounds().intersects(ratio->getBounds()))return 20;
         // Enforce responsive layout invariants at both default and minimum.
         // This fails CI before a clipped/colliding UI ships to Windows users.

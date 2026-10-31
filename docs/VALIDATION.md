@@ -52,3 +52,11 @@ Verify default 1120x760, minimum 960x670 and compact 380px Windows screenshot ge
 - Toggle external-to-internal with unchanged sidechain bus: signal must recover to 0.05/0.025. Assert host bypass restores unchanged input after smoothing, ignores +12 dB Input/Makeup, and reports zero algorithmic sample latency.
 - Validate mono main, no external SC and 1:1 unity ratio, at 32 samples. No host-bus memory boundary crossing.
 - Engine regression checks UI-only 16-frame ring ageing: 6 frames first, exactly 10 remaining, no more writes after the ring is cleared. Playback must not display frozen GR history after host stops; physical latency/dropout validation is still pending.
+
+## Premium small-control render acceptance
+
+- Windows screenshots show coral value sector visibly **outside/behind** the black-metal dial at top 900×765 and minimum 860×700; dot appears near the face rim and no central white needle remains. Dynamic graph, stereo meters and threshold interaction unchanged.
+- No persistent value boxes on any of the 13 sliders. Hover provides the current numeric value and unit via a dark tooltip; dragging shows JUCE value popup. Double-click reset and APVTS host automation still function.
+- All previous checkbox surfaces must render as compact capsule switches. DYNAMICS AUTO and SIDECHAIN EXT/LISTEN captions sit underneath; header ACTIVE text must not overlap the switch and must change to BYPASS when bypassed.
+- Supplied source `PAN-SLIDER.png` is in `ArSonCompKnobAssets`; smoke asserts it decodes as 18×40 and contains transparent corners plus opaque center. Thumb is 11×22 in render.
+- All prior host bus integration failure branches now emit a numeric `HOST_BUS_INTEGRATION_FAILED` diagnostic. Failures are not suppressed; no claim of new Windows artifact until that test and engine contract both pass.

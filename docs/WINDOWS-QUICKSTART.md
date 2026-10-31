@@ -48,3 +48,7 @@ All primary knobs now mimic machined/brushed aluminium with a black recessed cha
 ### Live-host readiness checks (new)
 
 Run the supplied Standalone on your audio interface and load the complete VST3 in a DAW or ArSonMiX. Start with 48 kHz and a 128-sample host buffer; repeat at 64 then 32 samples where stable. Route a mono kick/mic into the VST3 external Sidechain bus on a stereo track: when **EXT SC** is selected, a strong detector signal must attenuate the main stereo channels while preserving their balance; switching it off must restore internal detection. Try host Bypass at +12 dB Input and Makeup, preset save/reopen, MINI/full, then stop transport and confirm the last dynamics trace clears rather than freezing. Real driver round-trip latency is separate from the plugin's zero additional algorithmic samples.
+
+### New compact controls and value popups
+
+All knobs now show a larger coral arc **behind** the black metal asset and a small coral pointer dot near the rim. The numerical boxes under knobs/sliders have been removed for an uncluttered control strip: hover for current value/unit tooltip, drag for a transient value bubble, and double-click a knob to restore its factory value. All AUTO/EXT SC/LISTEN and header ACTIVE/BYPASS controls use small track switches. The linear sliders use the original user-supplied PAN-SLIDER black metallic thumb. This is GUI-only; zero added algorithmic DSP samples are unchanged.
