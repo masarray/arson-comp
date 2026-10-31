@@ -79,7 +79,10 @@ CompLook::CompLook() {
     setColour(juce::TextButton::textColourOffId,text);
     setColour(juce::ToggleButton::textColourId,text);
     setColour(juce::ToggleButton::tickColourId,accent);
-    setColour(juce::Label::textColourId,muted);
+    // Metal panel text uses a high-contrast neutral; muted gray on metal
+    // was unreadable in real 780px screenshots.
+    setColour(juce::Label::textColourId,
+        juce::Colour{arson::ui::EditorMetrics::controlCaptionRgb});
 }
 // Satin-finished combo surfaces: recessed but legible on a brushed chassis.
 void CompLook::drawComboBox(juce::Graphics& g,int width,int height,bool down,
@@ -330,7 +333,9 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         if(i==arson::Lowpass) shortLabel="LP";
         if(i==arson::Link) shortLabel="LINK";
         labels[i].setText(shortLabel,juce::dontSendNotification);
-        labels[i].setFont(juce::FontOptions(11.0f));
+        labels[i].setFont(juce::FontOptions(11.3f));
+        labels[i].setColour(juce::Label::textColourId,
+            juce::Colour{arson::ui::EditorMetrics::controlCaptionRgb});
         labels[i].setJustificationType(juce::Justification::centred);
         addAndMakeVisible(labels[i]);
         addAndMakeVisible(k);
@@ -454,11 +459,17 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         compactMode=!compactMode;
         if(compactMode) {
             expandedWidth=getWidth();expandedHeight=getHeight();
-            setResizeLimits(740,330,1200,330);
+            setResizeLimits(arson::ui::EditorMetrics::minWidth,
+                arson::ui::EditorMetrics::miniHeight,
+                arson::ui::EditorMetrics::maxWidth,
+                arson::ui::EditorMetrics::miniHeight);
             compact.setButtonText("FULL");
-            setSize(expandedWidth,330);
+            setSize(expandedWidth,arson::ui::EditorMetrics::miniHeight);
         } else {
-            setResizeLimits(740,585,1200,965);
+            setResizeLimits(arson::ui::EditorMetrics::minWidth,
+                arson::ui::EditorMetrics::minHeight,
+                arson::ui::EditorMetrics::maxWidth,
+                arson::ui::EditorMetrics::maxHeight);
             compact.setButtonText("MINI");
             setSize(expandedWidth,expandedHeight);
         }
@@ -477,8 +488,12 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     presets.setSelectedId(0,juce::dontSendNotification);
     presets.setText("Custom / restored",juce::dontSendNotification);
     setResizable(true,true);
-    setResizeLimits(740,585,1200,965);
-    setSize(780,640);
+    setResizeLimits(arson::ui::EditorMetrics::minWidth,
+        arson::ui::EditorMetrics::minHeight,
+        arson::ui::EditorMetrics::maxWidth,
+        arson::ui::EditorMetrics::maxHeight);
+    setSize(arson::ui::EditorMetrics::defaultWidth,
+            arson::ui::EditorMetrics::defaultHeight);
     syncPanelVisibility();
     startTimerHz(30);
 }
@@ -577,8 +592,7 @@ void Editor::syncPanelVisibility() {
 }
 void Editor::resized() {
     const int w=getWidth(),h=getHeight();
-    // A shared compact header grid: every control has the same baseline.
-    // Preset is constrained to 144..176px rather than consuming all free space.
+    // Compact header grid (124..154px preset); same baseline at 660..1040px.
     const auto header=arson::ui::HeaderLayout::calculate(w);
     compact.setBounds(header.mini);
     style.setBounds(header.model);
@@ -588,8 +602,9 @@ void Editor::resized() {
     bypass.setBounds(header.bypass);
     // Compact responsive hardware chassis; LCD still has its own display.
     display=compactMode?juce::Rectangle<int>{}:
-        juce::Rectangle<int>{8,70,w-16,h-268};
-    const int mainY=compactMode?68:display.getBottom()+5;
+        juce::Rectangle<int>{8,arson::ui::EditorMetrics::displayTop,
+            w-16,h-arson::ui::EditorMetrics::displayBottomReserve};
+    const int mainY=compactMode?66:display.getBottom()+5;
     const int cell=(w-28)/7;
     constexpr std::array<std::size_t,7> main{arson::Input,arson::Attack,
         arson::Release,arson::Threshold,arson::Ratio,arson::Knee,arson::Makeup};
@@ -599,7 +614,8 @@ void Editor::resized() {
         knobs[i].setBounds(x+3,mainY+20,cell-6,70);
     }
 
-    const int bottomY=compactMode?166:h-92;
+    const int bottomY=compactMode?166:
+        h-arson::ui::EditorMetrics::bottomControlsReserve;
     dynamicsTab.setBounds(16,bottomY+1,92,23);
     sidechainTab.setBounds(114,bottomY+1,94,23);
     // Main tab: four comfortable controls, plus a dedicated AUTO control.
@@ -817,13 +833,9 @@ void Editor::rebuildHistoryPaths() {
 void Editor::paint(juce::Graphics& g) {
     if(metalSurface.isValid())g.drawImageAt(metalSurface,0,0);
     else g.fillAll(juce::Colour{0xff454a4d});
-    // Soft satin chassis divisions remain visible over fine brushed grain.
-    g.setColour(juce::Colours::black.withAlpha(0.22f));
-    g.fillRect(0,0,getWidth(),68);
-    g.setColour(juce::Colours::white.withAlpha(0.12f));
-    g.drawHorizontalLine(1,0.0f,static_cast<float>(getWidth()));
-    g.setColour(juce::Colours::black.withAlpha(0.58f));
-    g.drawHorizontalLine(67,0.0f,static_cast<float>(getWidth()));
+    // Quiet header group: contrast by surface tone, not divider strokes.
+    g.setColour(juce::Colours::black.withAlpha(0.23f));
+    g.fillRect(0,0,getWidth(),arson::ui::EditorMetrics::headerHeight);
     // Single-line embossed brand and a quiet, consistent overline hierarchy.
     const auto header=arson::ui::HeaderLayout::calculate(getWidth());
     if(headerLogo.isValid()) {
@@ -836,47 +848,29 @@ void Editor::paint(juce::Graphics& g) {
         g.setFont(juce::FontOptions(17.0f));
         g.drawText("ArSonComp",header.logo,juce::Justification::centredLeft);
     }
-    // Subtle division between branding and functional toolbar; no visual noise.
-    g.setColour(juce::Colours::white.withAlpha(0.10f));
-    g.drawVerticalLine(header.logo.getRight()+5,18.0f,52.0f);
-    g.setColour(muted.withAlpha(0.85f));
-    g.setFont(juce::FontOptions(8.7f));
+    // Labels only for dropdowns; the other buttons identify themselves.
+    g.setColour(juce::Colour{arson::ui::EditorMetrics::captionRgb});
+    g.setFont(juce::FontOptions(9.5f));
     const auto caption=[&g](const char* title,const juce::Rectangle<int>& r) {
-        g.drawText(title,r.getX()+1,9,r.getWidth()-2,12,
+        g.drawText(title,r.getX()+1,7,r.getWidth()-2,12,
             juce::Justification::centredLeft,false);
     };
-    caption("VIEW",header.mini);
     caption("MODEL",header.model);
     caption("PRESET",header.preset);
-    caption("COMPARE",header.compare);
-    caption("FILES",header.file);
-    caption("ENGINE",header.bypass);
 
-    const int mainY=compactMode?68:display.getBottom()+5;
-    const int bottomY=compactMode?166:getHeight()-92;
+    const int mainY=compactMode?66:display.getBottom()+5;
+    const int bottomY=compactMode?166:
+        getHeight()-arson::ui::EditorMetrics::bottomControlsReserve;
     g.setColour(juce::Colours::black.withAlpha(0.105f));
     g.fillRect(8,mainY,getWidth()-16,bottomY-mainY);
-    g.setColour(juce::Colours::black.withAlpha(0.40f));
-    g.drawHorizontalLine(mainY,12.0f,static_cast<float>(getWidth()-12));
-    g.drawHorizontalLine(bottomY,12.0f,static_cast<float>(getWidth()-12));
-    g.setColour(juce::Colours::white.withAlpha(0.09f));
-    g.drawHorizontalLine(mainY+1,12.0f,static_cast<float>(getWidth()-12));
-    g.drawHorizontalLine(bottomY+1,12.0f,static_cast<float>(getWidth()-12));
-    const int cell=(getWidth()-28)/7;
-    for(int i=1;i<7;++i) {
-        g.setColour(juce::Colours::black.withAlpha(0.15f));
-        const float x=14.0f+static_cast<float>(i*cell);
-        g.drawVerticalLine(static_cast<int>(x),static_cast<float>(mainY+17),
-                           static_cast<float>(mainY+90));
-    }
+    // Remove six knob-cell fences and doubled chrome rules: whitespace
+    // and dark surfaces provide grouping with less visual interference.
     g.setColour(accent.withAlpha(0.68f));
     g.fillRoundedRectangle(sidechainPanel?115.0f:17.0f,
         static_cast<float>(bottomY+22),sidechainPanel?91.0f:88.0f,1.8f,1.0f);
-    // Cached chassis/header are static; the live LCD is an opaque child.
-    g.setColour(text.withAlpha(0.66f));
-    g.setFont(juce::FontOptions(9.0f));
-    g.drawText("0 SAMPLES ADDED / REALTIME DSP",
-        14,getHeight()-18,232,14,juce::Justification::left);
+    // Isolated canvas owns meter and graph painting; chassis stays cached.
+    // The footer is intentionally clear: the LCD already shows exact values.
+    // Eliminating the tiny technical slogan avoids visual competition.
 }
 void Editor::refreshTransfer(const arson::Parameters& p,juce::Rectangle<float> plot) {
     const std::array<float,4> key{{p[arson::Threshold],p[arson::Ratio],
