@@ -8,7 +8,7 @@ namespace arson::ui {
 // text/knobs down. Reused by the editor renderer and the Windows smoke tests.
 struct EditorMetrics {
     // Dense-but-usable hardware UI: 612px default instead of 704px.
-    // Main knobs keep a 62px drawing/drag target and readable 11px captions.
+    // Main knobs retain 58px hit targets and readable 10.4pt captions.
     static constexpr int minWidth=580, minHeight=480;
     static constexpr int defaultWidth=612, defaultHeight=500;
     static constexpr int maxWidth=1000, maxHeight=760;

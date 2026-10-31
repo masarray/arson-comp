@@ -21,3 +21,7 @@ JUCE smoke checks (1) exact image resource dimensions, (2) proportional artwork 
 ## Physical acceptance still needed
 
 Screenshot review at 612×500 / 580×480 / MINI, Windows 100%/125%/150% DPI and mouse hit-testing. PS22 crackle investigations and musical-compressor preset loudness remain independent release gates. Reference: FabFilter Pro-C 3 uses a separate Compact and resizable workflow; JUCE Graphics supports explicit aspect-preserving rendering. This patch does not copy protected graphics or proprietary DSP.
+
+## Windows screenshot refinement
+
+Actual Windows CI screenshots confirmed aspect ratio and caption spacing, but the Dynamics plate appeared too thin because the native track is almost 6:1. A separate 23px-deep painted gunmetal housing is now rendered BEHIND the proportional track. The full track and thumb retain their exact native aspect ratios and independent red fill. The housing is bounded within each slider's 34px control, adds no bitmap decoding/worker and is regression-tested through a real JUCE LookAndFeel screenshot pixel. This is deliberate visual review before release, not another audio-engine modification.

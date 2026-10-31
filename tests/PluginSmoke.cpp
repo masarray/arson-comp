@@ -264,6 +264,16 @@ static int runSmoke(int argc,char** argv) {
         const auto low=render(21.0f);
         const auto mid=render(80.0f);
         const auto high=render(139.0f);
+        // The scaled 6:1 track needs a separate visible metal bezel,
+        // otherwise short Dynamics controls look like flat red hairlines.
+        // Sample above the PNG track, inside the 23px bezel.
+        const auto housingPixel=low.getPixelAt(61,10);
+        const auto backdrop=juce::Colour{0xff44494d};
+        if(housingPixel.getBrightness()>=backdrop.getBrightness()-0.045f) {
+            std::cerr<<"FADER_HOUSING_DEPTH_78 pixel="
+                     <<housingPixel.toDisplayString(true)<<"\n";
+            return 78;
+        }
         const auto off=low.getPixelAt(61,20);
         const auto on=high.getPixelAt(61,20);
         if(on.getRed()<=off.getRed()+35 ||

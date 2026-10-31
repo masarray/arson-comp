@@ -218,6 +218,20 @@ void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
     const float left=geometry.left+static_cast<float>(x);
     const float right=geometry.right+static_cast<float>(x);
     const float position=geometry.position+static_cast<float>(x);
+    // The native track art is intentionally ~6:1. At an 85px control
+    // it becomes just 14px tall. A bounded *independent* metal housing
+    // restores the physical fader's depth without stretching either PNG.
+    // All geometry stays within the component; no image/cache allocation.
+    const float housingH=juce::jmin(23.0f,static_cast<float>(h)-6.0f);
+    const auto housing=juce::Rectangle<float>{
+        track.getX()-3.0f,cy-housingH*0.5f,track.getWidth()+6.0f,housingH};
+    g.setColour(juce::Colour{0xff262c31});
+    g.fillRoundedRectangle(housing,4.5f);
+    g.setColour(juce::Colour{0xff717a80}.withAlpha(0.42f));
+    g.drawRoundedRectangle(housing.reduced(0.5f),4.5f,0.9f);
+    g.setColour(juce::Colours::white.withAlpha(0.085f));
+    g.drawHorizontalLine(juce::roundToInt(housing.getY()+2.5f),
+        housing.getX()+5.0f,housing.getRight()-5.0f);
     if(sliderTrack.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
         g.drawImage(sliderTrack,track);
