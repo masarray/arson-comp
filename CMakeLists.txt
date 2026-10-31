@@ -44,18 +44,23 @@ if(ARSON_BUILD_PLUGIN)
     PRODUCT_NAME "ArSonComp" IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE EDITOR_WANTS_KEYBOARD_FOCUS FALSE COPY_PLUGIN_AFTER_BUILD FALSE
     VST3_CATEGORIES Fx Dynamics)
+  # Bundled reference-derived black brushed-metal image. Generated assets
+  # are compiled into the VST3/Standalone; no filesystem access at runtime.
+  juce_add_binary_data(ArSonCompKnobAssets
+    SOURCES assets/black_brushed_knob.jpg)
   target_sources(ArSonComp PRIVATE plugin/Processor.cpp plugin/Editor.cpp)
   if(MSVC)
     target_compile_options(ArSonComp PRIVATE /utf-8)
   endif()
   target_compile_definitions(ArSonComp PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0)
-  target_link_libraries(ArSonComp PRIVATE arson_engine juce::juce_audio_utils
+  target_link_libraries(ArSonComp PRIVATE arson_engine ArSonCompKnobAssets juce::juce_audio_utils
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags)
   if(BUILD_TESTING)
     juce_add_console_app(plugin_smoke PRODUCT_NAME "ArSonCompSmoke")
     target_sources(plugin_smoke PRIVATE tests/PluginSmoke.cpp)
-    target_link_libraries(plugin_smoke PRIVATE ArSonComp arson_engine juce::juce_audio_utils)
+    target_link_libraries(plugin_smoke PRIVATE ArSonComp ArSonCompKnobAssets
+      arson_engine juce::juce_audio_utils)
     add_test(NAME plugin_state_editor COMMAND plugin_smoke "${CMAKE_BINARY_DIR}/ArSonComp-preview.png")
     set_tests_properties(plugin_state_editor PROPERTIES TIMEOUT 30)
   endif()

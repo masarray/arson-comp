@@ -1,6 +1,7 @@
 #include "Editor.h"
 #include "PresetIO.h"
 #include "GraphPaint.h"
+#include "BinaryData.h"
 #include <cmath>
 #include <algorithm>
 
@@ -30,6 +31,12 @@ juce::String levelText(float v) {
 // All painting belongs to JUCE's message thread. No GUI object or
 // gradient/path/cache construction is reachable from processBlock.
 CompLook::CompLook() {
+    // Decode the single bundled brushed-metal photo on the message thread.
+    // It is never decoded, resized or accessed by the audio callback.
+    sourceFace=juce::ImageFileFormat::loadFrom(
+        BinaryData::black_brushed_knob_jpg,
+        static_cast<std::size_t>(BinaryData::black_brushed_knob_jpgSize));
+    jassert(sourceFace.isValid());
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colour{0xff31383e});
@@ -62,48 +69,20 @@ const juce::Image& CompLook::knobFace(int diameter,bool primary) {
     if(slot.pixels==diameter && slot.face.isValid())return slot.face;
     slot.pixels=diameter;
     slot.face=juce::Image(juce::Image::ARGB,diameter,diameter,true);
-    {
+    if(sourceFace.isValid()) {
+        // One-time circular alpha mask + high-quality scale at each dial size.
+        // The compressed JPEG is bundled with the binary; JPEG pixels outside
+        // the circular metal face never appear against the editor background.
         juce::Graphics g(slot.face);
-        const float d=static_cast<float>(diameter),cx=d*0.5f,cy=d*0.5f;
-        const float outer=d*0.5f-2.5f;
-        // A machined outer metal lip and matte-black channel.
-        g.setColour(juce::Colours::black.withAlpha(0.55f));
-        g.fillEllipse(cx-outer-1.0f,cy-outer+1.0f,2*outer+2,2*outer+2);
-        g.setGradientFill(juce::ColourGradient(juce::Colour{0xff898b8c},
-            cx-outer*0.65f,cy-outer,
-            juce::Colour{0xff292b2e},cx+outer*0.65f,cy+outer,false));
-        g.fillEllipse(cx-outer,cy-outer,2*outer,2*outer);
-        g.setColour(juce::Colour{0xffc0c1c0}.withAlpha(0.32f));
-        g.drawEllipse(cx-outer+0.8f,cy-outer+0.8f,2*outer-1.6f,2*outer-1.6f,0.75f);
-        const float channel=outer-3.5f;
-        g.setColour(juce::Colour{0xff07090b});
-        g.fillEllipse(cx-channel,cy-channel,2*channel,2*channel);
-        g.setColour(juce::Colour{0xff66676b}.withAlpha(0.33f));
-        g.drawEllipse(cx-channel+1.3f,cy-channel+1.3f,
-                      2*channel-2.6f,2*channel-2.6f,0.75f);
-
-        // Brushed aluminium face, generated once per geometric size.
-        const float faceRadius=channel-6.5f;
-        g.setGradientFill(juce::ColourGradient(juce::Colour{0xff696b6c},
-            cx-faceRadius*0.60f,cy-faceRadius*0.85f,
-            juce::Colour{0xff383b3e},cx+faceRadius*0.85f,cy+faceRadius*0.85f,false));
-        g.fillEllipse(cx-faceRadius,cy-faceRadius,2*faceRadius,2*faceRadius);
-        g.setGradientFill(juce::ColourGradient(juce::Colour{0xffd3d5d3}.withAlpha(0.24f),
-            cx-faceRadius*0.45f,cy-faceRadius*0.50f,
-            juce::Colours::transparentBlack,cx+faceRadius*0.70f,cy+faceRadius*0.75f,true));
-        g.fillEllipse(cx-faceRadius,cy-faceRadius,2*faceRadius,2*faceRadius);
-        // Micro-concentric machining pattern is deliberately subtle:
-        // a pre-baked 70-circle overlay, never 70 draw calls per UI frame.
-        for(int i=0;i<72;++i) {
-            const float t=(i+1.0f)/73.0f;
-            const float r=faceRadius*(0.07f+0.92f*t);
-            g.setColour(i%3==0?juce::Colours::white.withAlpha(0.052f)
-                             :juce::Colours::black.withAlpha(0.043f));
-            g.drawEllipse(cx-r,cy-r,r*2,r*2,0.50f);
-        }
-        g.setColour(juce::Colour{0xffafb0b0}.withAlpha(0.38f));
-        g.drawEllipse(cx-faceRadius,cy-faceRadius,2*faceRadius,2*faceRadius,0.85f);
-    } // flush JUCE Graphics before sampling/drawing cached Image
+        juce::Path circularClip;
+        constexpr float inset=1.25f;
+        const float size=static_cast<float>(diameter)-2.0f*inset;
+        circularClip.addEllipse(inset,inset,size,size);
+        g.reduceClipRegion(circularClip);
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImageWithin(sourceFace,0,0,diameter,diameter,
+                          juce::RectanglePlacement::stretchToFit);
+    }
     return slot.face;
 }
 void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,

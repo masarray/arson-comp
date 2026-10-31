@@ -1,6 +1,7 @@
 #include "../plugin/Processor.h"
 #include "../plugin/PresetIO.h"
 #include "../plugin/GraphPaint.h"
+#include "BinaryData.h"
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <iostream>
 int main(int argc,char** argv) {
@@ -66,6 +67,17 @@ int main(int argc,char** argv) {
                 <<" centre="<<centre<<" right="<<right<<'\n';
             return 26;
         }
+    }
+    // The black-metal knob must be an actual bundled image, not a fallback
+    // vector approximation or an external file that breaks in host sandbox.
+    {
+        const auto base=juce::ImageFileFormat::loadFrom(
+            BinaryData::black_brushed_knob_jpg,
+            static_cast<std::size_t>(BinaryData::black_brushed_knob_jpgSize));
+        if(!base.isValid() || base.getWidth()!=96 || base.getHeight()!=96)
+            return 33;
+        if(base.getPixelAt(48,48).getBrightness()<0.08f ||
+           base.getPixelAt(48,48).getBrightness()>0.90f)return 34;
     }
     Processor processor;processor.prepareToPlay(48000,128);
     if(processor.getLatencySamples()!=0) return 1;
