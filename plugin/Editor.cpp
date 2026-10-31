@@ -245,7 +245,7 @@ void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
 Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.snapshot()) {
     setLookAndFeel(&look);
     setOpaque(true);
-    // One-time UI-thread decode of the approved ArSonComp chrome logo.
+    // One-time UI-thread decode of the high-contrast brushed embossed wordmark.
     // Embedded via BinaryData: no runtime file I/O or audio impact.
     headerLogo=juce::ImageFileFormat::loadFrom(
         BinaryData::arsoncomp_header_logo_png,
@@ -732,11 +732,12 @@ void Editor::paint(juce::Graphics& g) {
     g.drawHorizontalLine(1,0.0f,static_cast<float>(getWidth()));
     g.setColour(juce::Colours::black.withAlpha(0.58f));
     g.drawHorizontalLine(67,0.0f,static_cast<float>(getWidth()));
-    // Brushed chrome/bright-red title asset replaces the old split text.
-    // 131px viewport stops before MINI starts at x=147; keep its aspect ratio.
+    // Compact single-line embossed ArSonComp wordmark. Crop is preprocessed into
+    // 360x72 pixels, with no subtitle or glow. The 131px viewport stops before
+    // MINI starts at x=147; retain aspect ratio for legibility on small displays.
     if(headerLogo.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImageWithin(headerLogo,13,10,131,44,juce::RectanglePlacement::centred);
+        g.drawImageWithin(headerLogo,13,17,131,31,juce::RectanglePlacement::centred);
     } else {
         // Graceful fallback for missing/corrupt embedded resources.
         g.setColour(text);

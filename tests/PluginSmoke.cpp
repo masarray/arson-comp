@@ -285,23 +285,40 @@ int main(int argc,char** argv) {
         if(countHue(render("Bypass",true),false)<70||
            countHue(render("Bypass",false),true)<70)return 58;
     }
-    // Product title is embedded RGBA with visible LED-red COMPRESSOR subtitle.
+    // The small header uses the real metallic EMBOSS PNG, not a scaled-down
+    // two-line neon image. RGBA, bright metal and no red subtitle are required.
     {
         const auto logo=juce::ImageFileFormat::loadFrom(
             BinaryData::arsoncomp_header_logo_png,
             static_cast<std::size_t>(BinaryData::arsoncomp_header_logo_pngSize));
-        if(!logo.isValid()||logo.getWidth()!=256||logo.getHeight()!=55||
+        if(!logo.isValid()||logo.getWidth()!=360||logo.getHeight()!=72||
            logo.getPixelAt(0,0).getFloatAlpha()>0.02f)return 59;
-        int glowingRed=0;
-        for(int y=29;y<55;++y)
-            for(int x=48;x<226;++x) {
+        int brightMetal=0,redPixels=0;
+        for(int y=0;y<logo.getHeight();++y)
+            for(int x=0;x<logo.getWidth();++x) {
                 const auto p=logo.getPixelAt(x,y);
-                if(p.getAlpha()>100 && p.getRed()>100 &&
-                   p.getRed()>p.getGreen()+30 &&
-                   p.getRed()>p.getBlue()+25)
-                    ++glowingRed;
+                if(p.getAlpha()>170 && p.getRed()>145 &&
+                   std::abs(int(p.getRed())-int(p.getGreen()))<30 &&
+                   std::abs(int(p.getGreen())-int(p.getBlue()))<35)
+                    ++brightMetal;
+                if(p.getAlpha()>120 && p.getRed()>p.getGreen()+45)
+                    ++redPixels;
             }
-        if(glowingRed<100)return 60;
+        if(brightMetal<600||redPixels>10)return 60;
+        // Real 131px GUI header footprint: verify highlights survive downscale.
+        juce::Image header(juce::Image::RGB,148,66,true);
+        {
+            juce::Graphics g(header);
+            g.fillAll(juce::Colour{0xff282c2f});
+            g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+            g.drawImageWithin(logo,13,17,131,31,juce::RectanglePlacement::centred);
+        }
+        int visibleHighlight=0;
+        for(int y=19;y<46;++y)
+            for(int x=14;x<144;++x)
+                if(header.getPixelAt(x,y).getBrightness()>0.54f)
+                    ++visibleHighlight;
+        if(visibleHighlight<80)return 61;
     }
     // Cached chassis must be genuinely brushed grey, while the LCD
     // must remain deep black. Probe actual JUCE image rasterization after
