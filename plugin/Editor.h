@@ -60,6 +60,9 @@ private:
     juce::Image grid;
     juce::Path transferCurve,transferShade;
     juce::Path inputHistory,outputHistory,reductionHistory,reductionArea;
+    // Six cached horizontal gradient brushes: input, output, GR, transfer,
+    // transfer glow and reduction-area fade. Built only on full-view resize.
+    std::array<juce::ColourGradient,6> edgeFades;
     std::array<float,4> cachedCurveKey{{999,999,999,999}};
     float cachedCurveWidth=-1;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Editor)

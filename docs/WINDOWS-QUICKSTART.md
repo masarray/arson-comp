@@ -36,3 +36,7 @@ Check upper central transfer graph, red fading curve and live gain reduction lin
 ### Focused GUI revision
 
 The current test build opens at 900×765 instead of 1120×760. Minimum resizable size is 860×700; MINI is 380px high, and FULL restores the previous expanded dimensions. Check that all header elements fit, HP/LP and detector AUTO/EXT SC/LISTEN do not collide, and that long explanations appear in tooltips. With a running signal, verify smooth meter/GR motion against the exact audio; smoothing is UI only, with zero extra DSP samples.
+
+### Two-sided dissolve, low-cost LED metering
+
+Use the Standalone EXE or VST3 from the **latest** matching Windows Actions artifact. With audio playing, confirm the red gain-reduction trace and gray input/output traces disappear gradually at **both ends** of the dynamics graph without abrupt vertical cutoffs, while remaining crisp in the middle. The curve marker and compressor settings must still work as before. Confirm meters decay smoothly and their unlit segments are visible at all levels. Graph rendering is GUI-only, with no lookahead or additional algorithmic audio samples. Measure CPU and crackles in your own host/driver at 32/64/128 sample buffers rather than treating CI synthetic numbers as real-device measurements.

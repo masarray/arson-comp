@@ -1,9 +1,41 @@
 #include "../plugin/Processor.h"
 #include "../plugin/PresetIO.h"
+#include "../plugin/GraphPaint.h"
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <iostream>
 int main(int argc,char** argv) {
     juce::ScopedJuceInitialiser_GUI gui;
+    // Quantitative edge-dissolve contract: endpoints transparent, the
+    // central ~73% clearly visible, symmetric fades and stable RGB.
+    {
+        const auto coral=juce::Colour{0xffdf5860};
+        const auto fade=arson::ui::makeEdgeFade(coral,0.0f,239.0f,0.9f);
+        if(fade.getNumColours()!=4 ||
+           fade.getColourAtPosition(0.0).getFloatAlpha()>0.01f ||
+           fade.getColourAtPosition(1.0).getFloatAlpha()>0.01f ||
+           fade.getColourAtPosition(0.5).getFloatAlpha()<0.88f ||
+           fade.getColourAtPosition(0.02).getFloatAlpha()>=
+             fade.getColourAtPosition(0.10).getFloatAlpha() ||
+           std::abs(fade.getColourAtPosition(0.07).getFloatAlpha()-
+                    fade.getColourAtPosition(0.93).getFloatAlpha())>0.02f)
+            return 24;
+        const auto transfer=arson::ui::makeEdgeFade(coral,0.0f,239.0f,1.0f,0.18f);
+        if(transfer.getColourAtPosition(0.0).getFloatAlpha()<0.17f ||
+           transfer.getColourAtPosition(0.50).getFloatAlpha()<0.99f)
+            return 25;
+
+        // Actual software rasterizer output: no hidden bitmap, no blur,
+        // and both ends less bright than the middle in a real ARGB image.
+        juce::Image canvas(juce::Image::ARGB,240,16,true);
+        juce::Graphics graph(canvas);
+        graph.setGradientFill(fade);
+        graph.drawLine(0.0f,8.0f,239.0f,8.0f,2.0f);
+        const float left=canvas.getPixelAt(5,8).getFloatAlpha();
+        const float centre=canvas.getPixelAt(120,8).getFloatAlpha();
+        const float right=canvas.getPixelAt(234,8).getFloatAlpha();
+        if(!(centre>0.7f && left<centre*0.35f && right<centre*0.35f))
+            return 26;
+    }
     Processor processor;processor.prepareToPlay(48000,128);
     if(processor.getLatencySamples()!=0) return 1;
     auto* parameter=processor.state.getParameter("threshold");parameter->setValueNotifyingHost(parameter->convertTo0to1(-27));

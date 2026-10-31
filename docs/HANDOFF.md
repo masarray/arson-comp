@@ -19,3 +19,9 @@ The supplied red ArSonComp mockup is now the acceptance layout for a full-width 
 ## Focused-layout milestone handoff
 
 The full reference GUI in commit f63e8c6 passed Windows/Linux CI, but user feedback on actual screenshot showed it was too wide and secondary controls were crowded. The new grouped follow-up moves to 900x765 default (860x700 minimum), shortens secondary labels with tooltip help, reflows all header/buttons/slider regions and adds smoke collision bounds tests. It also caches 400-point signal/GR Path objects between actual telemetry updates and applies UI-only time-based meter easing. Do not move easing onto the audio callback or add Lookahead. Review default/minimum/MINI Windows screenshots before release; host/pluginval/real device tests remain outstanding.
+
+## Edge dissolve and physical-test handoff
+
+The latest grouped GUI milestone applies symmetric horizontal transparency fades to input/output/GR history and keeps the transfer curve readable with a lower-opacity edge; cache the six gradient brushes and meter rails on resize. The new `GraphPaint.h` helper is GUI-only; numerical and ARGB rasterizer smoke asserts actual fades. Meter-active segments are rendered at 30Hz over pre-rendered inactive rails; do not recreate LED background rectangles every frame. There must be **no** DSP engine changes or new audio-thread visual work.
+
+Build and visually inspect 900x765 default, 860x700 minimum and MINI 380 screenshots in the Windows Actions artifact before distributing. Verify live rendering on the user's real Windows host/ASIO interface and DAW/ArSonMiX, check visual motion and actual CPU usage, channel independence, host automation, and session reopen. Running an editor smoke in CI does not replace a physical-device validation.

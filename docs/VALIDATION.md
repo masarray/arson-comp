@@ -29,3 +29,11 @@ Verify default 1120x760, minimum 960x670 and compact 380px Windows screenshot ge
 - Screenshot visual review: graph aspect and central prominence, legible 6 dB grid, restrained coral dissolving fill, stereo LED meters, large Threshold, full/mini readability.
 - UI 30 Hz timing and 100 Hz bounded queue; time-based meter easing only on GUI; fixed ring history paths reused across paints and recomputed only for new telemetry or resize. Confirm on host with audio that motion is smoother without extra DSP latency.
 - No engine code changed on this milestone; zero added sample contract preserved. Benchmark multiple editors/instances and measure CPU only from real device when available. pluginval / 150% DPI still pending.
+
+## Graph-edge dissolve — required validation
+
+- JUCE `ColourGradient::addColour` four-stop alpha unit test: transparent endpoints, full centre, mirror-like left/right falloffs; transfer retains nonzero edge alpha for readability.
+- Raster test: draw line using real JUCE ARGB `Graphics`, check centre alpha > 0.70 and both edge samples < 35% of centre; no bitmap masks or CPU blur.
+- Assert full/minimum/MINI editor snapshots, preset save/reload, automation ID stability, no overlap and independent stereo metering via existing tests.
+- Static segmented meter rails cached in resized image; repaint draws **only active** segments plus labels/values. Confirm no off-bars ghosting with host running then stopping and resizing.
+- No engine changes: existing Linux sanitizer suite proves zero additional DSP samples, bounded SPSC and no audio-thread allocation. Pending real-device CPU/latency/pluginval and 150% DPI.

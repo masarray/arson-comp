@@ -1,5 +1,6 @@
 #include "Editor.h"
 #include "PresetIO.h"
+#include "GraphPaint.h"
 #include <cmath>
 #include <algorithm>
 
@@ -415,6 +416,20 @@ void Editor::resized() {
     g.setColour(juce::Colour{0xff454b50}.withAlpha(0.75f));
     g.drawVerticalLine(static_cast<int>(left)-45,18.0f,height-20.0f);
     g.drawVerticalLine(static_cast<int>(right)+12,18.0f,height-20.0f);
+    // Fully reusable gradient stops; preserve transfer readability at
+    // near-silent endpoints while moving traces dissolve to transparent.
+    const float x0=plot.getX(),x1=plot.getRight();
+    edgeFades[0]=arson::ui::makeEdgeFade(juce::Colours::white,x0,x1,0.19f);
+    edgeFades[1]=arson::ui::makeEdgeFade(juce::Colour{0xffd8d9d8},x0,x1,0.52f);
+    edgeFades[2]=arson::ui::makeEdgeFade(accentBright,x0,x1,0.91f);
+    edgeFades[3]=arson::ui::makeEdgeFade(accentBright,x0,x1,0.97f,0.18f);
+    edgeFades[4]=arson::ui::makeEdgeFade(accent,x0,x1,0.14f,0.10f);
+    edgeFades[5]=arson::ui::makeEdgeFade(accent,x0,x1,0.105f);
+    // Pre-rasterize inactive LED rails once with grid; runtime paints
+    // active segments only, avoiding ~230 inactive rect draws per frame.
+    arson::ui::paintMeterRail(g,{14.0f,plot.getY(),33.0f,plot.getHeight()},false);
+    arson::ui::paintMeterRail(g,{width-110.0f,plot.getY(),34.0f,plot.getHeight()},true);
+    arson::ui::paintMeterRail(g,{width-61.0f,plot.getY(),42.0f,plot.getHeight()},false);
     rebuildHistoryPaths();
 }
 void Editor::timerCallback() {
@@ -579,34 +594,33 @@ void Editor::drawMeter(juce::Graphics& g,juce::Rectangle<float> bounds,
     g.setFont(juce::FontOptions(10.0f));
     g.drawText(title,static_cast<int>(x)-3,static_cast<int>(y)-22,
         static_cast<int>(bounds.getWidth())+6,18,juce::Justification::centred);
-    const int bars=(gainReduction || currentChannels==1)?1:2;
+    // Cached dark LED rails are already part of Editor::grid.
+    // Draw only the illuminated pixels, no 46x redraw of dark segments.
+    const int bars=gainReduction?1:2;
     const float bw=bars==1?13.0f:9.0f;
     const float spacing=3.0f;
     const float total=bw*bars+spacing*(bars-1);
     const float start=x+(bounds.getWidth()-total)*0.5f;
+    constexpr int segments=46;
+    const float segmentH=h/static_cast<float>(segments);
     for(int c=0;c<bars;++c) {
-        const float db=c==0?dB1:dB2;
-        const float fill=gainReduction ? clamp01(db/30.0f) : dbFraction(db);
+        const float db=(c==0?dB1:(currentChannels==1?-120.0f:dB2));
+        const float fraction=gainReduction?clamp01(db/30.0f):dbFraction(db);
+        const int active=juce::jlimit(0,segments,
+            static_cast<int>(std::ceil(fraction*static_cast<float>(segments))));
         const float bx=start+c*(bw+spacing);
-        g.setColour(juce::Colour{0xff20262a});
-        g.fillRect(bx,y,bw,h);
-        constexpr int segments=46;
-        const float sh=h/static_cast<float>(segments);
-        for(int step=0;step<segments;++step) {
-            const float fraction=static_cast<float>(step+1)/segments;
-            const float sy=gainReduction?y+step*sh:y+h-(step+1)*sh;
-            if(fraction<=fill) {
-                juce::Colour color;
-                if(gainReduction)color=accent;
-                else if(fraction>0.90f)color=juce::Colour{0xffff5c63};
-                else if(fraction>0.71f)color=yellow;
-                else color=green;
-                g.setColour(color);
-            } else g.setColour(juce::Colour{0xff313637}.withAlpha(0.52f));
-            g.fillRect(bx,sy,bw,std::max(1.0f,sh-1.2f));
+        for(int step=0;step<active;++step) {
+            // GR grows downwards; input/output grow upwards.
+            const float yy=gainReduction?y+step*segmentH:
+                y+h-(step+1)*segmentH;
+            juce::Colour colour=gainReduction?accent:
+                (static_cast<float>(step+1)/segments>0.90f?
+                    juce::Colour{0xffff5c63}:
+                (static_cast<float>(step+1)/segments>0.71f?
+                    yellow:green));
+            g.setColour(colour);
+            g.fillRect(bx,yy,bw,std::max(1.0f,segmentH-1.2f));
         }
-        g.setColour(juce::Colour{0xff535b60});
-        g.drawRect(bx-1.0f,y-1.0f,bw+2,h+2,0.7f);
     }
     g.setFont(juce::FontOptions(11.0f));
     g.setColour(text);
@@ -639,9 +653,9 @@ void Editor::drawDisplay(juce::Graphics& g) {
         plot.getX(),plot.getY()+plot.getHeight()*0.28f,
         accent.withAlpha(0.005f),plot.getX(),plot.getBottom(),false));
     g.fillPath(transferShade);
-    g.setColour(accent.withAlpha(0.12f));
+    g.setGradientFill(edgeFades[4]);
     g.strokePath(transferCurve,juce::PathStrokeType(6.0f));
-    g.setColour(accentBright);
+    g.setGradientFill(edgeFades[3]);
     g.strokePath(transferCurve,juce::PathStrokeType(2.1f));
 
     const float mx=plot.getX()+dbFraction(p[arson::Threshold])*plot.getWidth();
@@ -657,15 +671,13 @@ void Editor::drawDisplay(juce::Graphics& g) {
 
     // These 400-point paths are computed once when fresh telemetry arrives,
     // never rebuilt by repaint or a host redraw. All buffers live on GUI.
-    g.setGradientFill(juce::ColourGradient(accent.withAlpha(0.14f),
-        plot.getX(),plot.getY(),accent.withAlpha(0.0f),
-        plot.getX(),plot.getY()+plot.getHeight()*0.4f,false));
+    g.setGradientFill(edgeFades[5]);
     g.fillPath(reductionArea);
-    g.setColour(juce::Colours::white.withAlpha(0.18f));
+    g.setGradientFill(edgeFades[0]);
     g.strokePath(inputHistory,juce::PathStrokeType(1.05f));
-    g.setColour(juce::Colour{0xffd8d9d8}.withAlpha(0.50f));
+    g.setGradientFill(edgeFades[1]);
     g.strokePath(outputHistory,juce::PathStrokeType(1.1f));
-    g.setColour(accentBright.withAlpha(0.90f));
+    g.setGradientFill(edgeFades[2]);
     g.strokePath(reductionHistory,juce::PathStrokeType(1.55f));
 
     drawMeter(g,{14.0f,plot.getY(),33.0f,plot.getHeight()},
