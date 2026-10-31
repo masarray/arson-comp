@@ -366,10 +366,14 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         if(id==1000) {
             // Opening and dismissing a browser must NOT lose the currently
             // loaded preset title (or a user-restored custom name).
-            const auto name=presets.getText();
             presets.setSelectedId(0,juce::dontSendNotification);
-            presets.setText(name,juce::dontSendNotification);
-            openPresetBrowser();
+            presets.setText(currentPresetTitle,juce::dontSendNotification);
+            // Open after the native combo popup has completed its selection
+            // event, so the host cannot immediately reclaim focus/z-order.
+            juce::Component::SafePointer<Editor> safe(this);
+            juce::MessageManager::callAsync([safe] {
+                if(auto* editor=safe.getComponent())editor->openPresetBrowser();
+            });
         } else if(id>0) applyPreset(id);
     };
     addAndMakeVisible(presets);
@@ -399,8 +403,9 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         for(std::size_t i=0;i<arson::Count;++i) setValue(i,alternate[i]);
         alternate=current;alternateActive=!alternateActive;
         compare.setButtonText(alternateActive?"B / A":"A / B");
+        currentPresetTitle="Custom";
         presets.setSelectedId(0,juce::dontSendNotification);
-        presets.setText("Custom",juce::dontSendNotification);
+        presets.setText(currentPresetTitle,juce::dontSendNotification);
     };
     addAndMakeVisible(compare);
     savePreset.setComponentID("preset.save");
@@ -446,7 +451,8 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
                     }
                     editor->presetSnapshot=editor->processor.snapshot();
                     editor->presets.setSelectedId(0,juce::dontSendNotification);
-                    editor->presets.setText(file.getFileNameWithoutExtension(),juce::dontSendNotification);
+                    editor->currentPresetTitle=file.getFileNameWithoutExtension();
+                    editor->presets.setText(editor->currentPresetTitle,juce::dontSendNotification);
                     editor->cachedCurveKey[0]=999;
                     editor->repaint();
                 }
@@ -512,10 +518,9 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     updateHoverReadout(hoveredParameter);
     arson::MeterFrame discard;
     for(std::uint32_t i=0;i<arson::MeterQueue::capacity && p.meters.pop(discard);++i){}
-    presetSnapshot=arson::preset::factoryBank().front().settings;
-    presets.setSelectedId(1,juce::dontSendNotification);
-    presets.setText(arson::preset::factoryBank().front().name,
-                    juce::dontSendNotification);
+    presetSnapshot=processor.snapshot();
+    presets.setSelectedId(0,juce::dontSendNotification);
+    presets.setText(currentPresetTitle,juce::dontSendNotification);
     setResizable(true,true);
     setResizeLimits(arson::ui::EditorMetrics::minWidth,
         arson::ui::EditorMetrics::minHeight,
@@ -752,8 +757,9 @@ void Editor::applyPreset(int id) {
         setValue(i,p.settings[i]);
     }
     presetSnapshot=p.settings;
+    currentPresetTitle=p.name;
     presets.setSelectedId(id,juce::dontSendNotification);
-    presets.setText(p.name,juce::dontSendNotification);
+    presets.setText(currentPresetTitle,juce::dontSendNotification);
     cachedCurveKey[0]=999;
     graphCanvas.repaint();
 }
@@ -933,8 +939,9 @@ void Editor::timerCallback() {
         for(std::size_t i=0;i<arson::Count;++i)
             if(i!=arson::External && i!=arson::Listen && i!=arson::Bypass &&
                std::abs(current[i]-presetSnapshot[i])>0.001f) {
+                currentPresetTitle="Custom";
                 presets.setSelectedId(0,juce::dontSendNotification);
-                presets.setText("Custom",juce::dontSendNotification);
+                presets.setText(currentPresetTitle,juce::dontSendNotification);
                 break;
             }
     }

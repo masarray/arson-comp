@@ -115,6 +115,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> detectorAttachment,styleAttachment;
     std::unique_ptr<juce::FileChooser> presetChooser;
     arson::Parameters alternate, presetSnapshot;
+    juce::String currentPresetTitle{"Custom / restored"};
     bool alternateActive=false;
     bool compactMode=false,thresholdDragging=false,sidechainPanel=false;
     int expandedWidth=612,expandedHeight=500;
