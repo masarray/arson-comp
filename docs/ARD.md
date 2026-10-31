@@ -1,0 +1,92 @@
+# Architecture
+
+## Ownership and scheduling
+
+`engine/` is a C++17 static library; `plugin/Processor` adapts host buses, parameters and state; `plugin/Editor` owns presentation. DSP lifetime is independent of editor lifetime. No worker is needed for this bounded, causal processing workload.
+
+The processor caches APVTS atomic pointers once, then snapshots parameters once per block. Snapshot comparisons happen before coefficient/linear gain conversions, eliminating `exp` work for unchanged host values. The Peak path keeps RMS state updated but skips an unnecessary `sqrt`; detector transitions still crossfade over 5 ms. Parameters are clamped/canonicalized; expensive time/filter coefficients only change when their parameter changes. Input/makeup dB conversion occurs at control updates and linear gain ramps run in audio. Five-millisecond ramps protect continuous gain/curve/mix and boolean transitions. Attack/release coefficient updates preserve the current envelope. Sidechain filter coefficients update at block boundaries; rapid cutoff automation during Listen SC still needs listening validation.
+
+Signal flow: input trim → detector tap → optional detector HP/LP → Peak/RMS blend → channel linking → soft-knee static reduction → attack/hold/release envelope → gain application → parallel mix → SC listen crossfade → bypass crossfade. Dry/wet paths share the same sample index. Bypass returns original input after its short transition. Non-finite input is replaced with silence; input magnitudes beyond ±32 are bounded for numerical containment.
+
+The three independent zero-added-latency models are Clean (feed-forward), Feedback (causal detector sensing prior actual pre-makeup attenuation), and Smooth (a second attack/release pole cascaded with the first). All modes process one shared audio path; a 5 ms model ramp blends their behavior without triple-rendering. The stable model parameter ID `style` is appended to the schema. Existing hosts using the original parameter IDs preserve them. These models are original algorithms, not claimed clones of proprietary compression styles.
+
+GUI reference-layout milestone (historical composition target; current dimensions and controls below): one large integrated graph in the upper panel combines a real transfer curve (red glowing line and soft fade), measured 4-second input/output and gain-reduction traces, input stereo LED bars on the left, GR and output stereo bars on the right. Main hardware row: Input, Attack, Release, oversized Threshold, Ratio, Knee, Makeup; bottom strip: Range, Hold, Mix, Link, SC HP/LP, Peak/RMS, AutoRelease, External SC and Listen SC. Header: model, preset, FILE (Save/Open), A/B, bypass and MINI. The supplied mockup dictates composition; UI artwork and code are original JUCE vector rendering. The transfer graph uses input dB horizontally while history is time-based, deliberately independent overlaid information layers. All data traces are measured. No fictional Lookahead knob: zero added algorithmic sample latency is mandatory. The current integrated display is 780×640 default, 740×585 minimum, and 330px-high MINI. One cached background rebuilds on resize, the transfer path is cached by threshold/ratio/knee/range/graph width, and the metering draws at 30 Hz on the message thread only; audio never touches GUI. The 100 Hz MeterFrame has independent input/output L/R peaks; side bars are not duplicated aggregate maxima.
+
+RMS detector uses a 10 ms exponential energy estimate. Attack/release are 63.2% time constants in the dB reduction domain. Auto release blends base and 4× slower release coefficients according to existing reduction. This is an explicit independent design, not a recreation of FabFilter's undisclosed program-dependent models. The first-order detector HP/LP are bypassed at 20 Hz / 20 kHz endpoints. Stereo linking blends each detector toward the maximum channel level.
+
+## Data exchange
+
+A fixed 512-slot SPSC queue transfers 10 ms maxima (input, output, reduction, individual input/output L/R peaks). Acquire/release publication protects non-atomic slots; read/write indices occupy distinct cache lines. Audio drops frames if full. There is exactly one editor consumer. Editor drains at most 512 frames per 30 Hz tick, updates its fixed 400-frame history and coalesces meter repaint. The editor also supports an original compact hardware-inspired layout (380 px tall, no graph allocations) and direct transfer-marker threshold gestures with one `beginChangeGesture`/`endChangeGesture` pair per drag; teardown ends any unfinished gesture. Reopening discards a bounded stale backlog. Static display grid is rebuilt on resize, not on audio or every timer tick.
+
+APVTS parameter atomics are independent, so bulk preset/state changes can be observed across adjacent audio blocks; five-millisecond ramps limit transition artifacts. They are not claimed to be a transactional sample-accurate preset switch. Host automation is block-rate in this implementation. State XML serialization is outside processBlock. Schema 1 rejects unknown root/schema and restores finite, clamped known values.
+
+RAII owns GUI attachments and buffers. Timer is stopped before editor teardown. No process-global mutable DSP state. Audio never accesses editor objects. Memory use does not grow with session duration.
+
+## Reference decisions
+
+- FabFilter Pro-C 3 help (2026): https://www.fabfilter.com/help/pro-c — reference for model differentiation, large level/transfer metering, compact controls, and live audio workflow. Official detailed UI evidence: https://www.fabfilter.com/help/pro-c/using/displays and https://www.fabfilter.com/help/pro-c/using/overview . Latency design: https://www.fabfilter.com/help/pro-c/using/oversampling (zero-latency requires lookahead and oversampling Off). Original UI design and independent compressor models are mandatory. No FabFilter assets, algorithms or branding are used. Lookahead/oversampling are intentionally absent from the live zero-latency path.
+- JUCE APVTS documentation: https://docs.juce.com/master/classjuce_1_1AudioProcessorValueTreeState.html — raw atomic parameter reads and state/attachment separation.
+- JUCE source pinned at 8.0.12: https://github.com/juce-framework/JUCE/tree/29396c22c93392d6738e021b83196283d6e4d850 — build reproducibility, not an assertion this is the newest release.
+
+## Deferred, not represented as working
+
+Pro-C-specific styles, mid/side compression, frequency-dependent linking, auto makeup, lookahead/offline quality mode, oversampling, scalable vector accessibility polish, user preset files, ASIO standalone integration and measured proprietary sound matching. Future modes must declare latency and pass block/automation tests separately.
+
+## Focused-layout / animation CPU milestone
+
+GUI target: **900x765 default; 860x700 min; 380px MINI**, instead of 1120x760. Header reserves safe widths for logo, MINI, model, preset, SAVE, OPEN, A/B and bypass. Main row contains exactly 7 knobs with larger Threshold. Secondary row computes 6 bounded strips plus fixed right-side space for detector and three shortened flags; labels keep full descriptions in dark custom JUCE tooltips. Geometric overlap and bounds are asserted by plugin smoke at default/min sizes, including MINI/FULL restoration.
+
+GUI drawing pipeline: `resized` caches graph background and regenerates path geometry for the new size; `timerCallback` drains SPSC 100 Hz samples once then computes time-compensated meter display easing (18ms rise/210ms fall, 22ms GR rise/185ms fall); when new frames arrive, it computes and reuses four 400-point paths for the time history with lightweight visual one-pole smoothing. `drawDisplay` only strokes existing time paths, cached transfer curve and segmented LED meters at 30 Hz, with dirty-region repaint. This removes repeated per-paint conversion/path-building for ~1200 dB point calculations. All smoothing affects presentation alone; DSP has unchanged zero added algorithmic samples. If editor is hidden, timer skips heavy visualization updates; reopening drains and paints the bounded queue.
+
+## Edge-fade brush cache and meter rails
+
+`plugin/GraphPaint.h` keeps a single composable, GUI-only four-stop horizontal colour gradient helper and reusable meter-rail painting function. The colour stops at x=0 (0% opacity), 13.5% (full), 86.5% (full) and x=100% (0%) apply to live IN / OUT / GR strokes, without a postprocessing blur or offscreen layer. Transfer law keeps ~18% edge brightness to remain visually recognizable at the graph boundaries. The actual centre segment is unchanged and continues to display measured telemetry. Dither/traces are not fabricated.
+
+`Editor::resized` caches six gradients and the 46-segment dark LED rails into the existing graph background, then `drawDisplay` only composites the cached paths using gradient strokes and draws active segments on top. This eliminates ~5×46 inactive-rectangle paints per 30Hz GUI frame and avoids allocating new gradient stop arrays on every paint. The waveform paths are rebuilt only on new telemetry/resize; gain reduction and static transfer DSP logic are untouched. All objects remain message-thread-owned.
+
+## Brushed metal / progressive disclosure milestone
+
+Knob implementation is original software vector art derived from the supplied photo's form language. `CompLook::knobFace` caches one ARGB face for each of the two primary sizes, including a beveled outer lip, recessed black ring and 72 concentric alpha micro-strokes as a faint machined grain; cache refresh occurs only when the dial diameter changes. `drawRotarySlider` uses a cheap cached `drawImageAt`, a two-pass active coral arc on the dark groove and a calibrated center needle. No hundreds of circles per timer tick and no image decoding. `CompLook` and the cache are UI-owned; DSP is untouched.
+
+Progressive-disclosure controls preserve all original host parameter IDs and APVTS attachments. Header FILE opens an asynchronous PopupMenu whose Save/Open options trigger the previously implemented async file dialogs without displaying separate permanent buttons. The bottom DYNAMICS/SIDECHAIN switch changes only Component visibility, not the parameter tree, routing, or audio topology. Main view: Range, Hold, Mix, Link, Auto Release. Sidechain view: detector HP/LP, Peak/RMS, External SC, Listen SC. Both pages render inside a 126px reserved footer at 900x765 default, 860x700 minimum, and 380px MINI, preserving the central graph and sidebar LEDs. CI checks bounds and state transitions.
+
+Maintainability: one `syncPanelVisibility()` is the only source of truth for secondary control visibility and tab emphasis. Text shortcuts hide lengthy captions behind existing premium tooltips. Widgets in hidden pages remain alive and host-automatable. The real-time engine still has zero added algorithmic sample latency.
+
+## Integrated black radial-knob resource
+
+`assets/black_brushed_knob.jpg` is the compact 96×96 compressed build-time image source derived from the user's supplied silver image, recolored to deep gunmetal. The asset has realistic specular radial brush-work; it replaces simulated 72-circle procedural grain. `juce_add_binary_data(ArSonCompKnobAssets)` turns it into compile-time resources used by the VST3, Standalone and GUI smoke tests. `CompLook::CompLook` loads JPEG from `BinaryData` one time on the message thread; `knobFace` composites a round-cropped ARGB tile at the standard/Threshold sizes and caches both. The dynamic coral arc and value marker stay overlay vector geometry. Binary resource checks prevent an empty knob when host paths differ. No changes to DSP, parameter IDs, allocation in audio callbacks or added latency.
+
+## Real host routing and stale-graph lifecycle
+
+`plugin_smoke` now configures JUCE's actual main stereo + mono Sidechain buses and calls `Processor::processBlock()` at 32, 64 and 128 frames, with a known one-second detector signal. Assert expected compression, independent stereo scaling, sidechain input buffer intact, internal detector recovery, host bypass transparency after 5ms automation smoothing, and reported zero additional DSP samples. Run a separate mono/no-sidechain bus case. These tests validate JUCE bus offsets rather than only the library-level `Compressor::process` tests.
+
+`plugin/GraphHistory.h` contains one JUCE-free, bounded GUI-ring ageing helper. The editor timestamps the last actual telemetry, then after 150 ms without producer frames advances the history with silent samples at ~100Hz based on UI clock. The helper caps inserts to 400 frames, then stops; actual metering still comes solely through the original SPSC queue. The audio engine and thread never touch history or timestamps.
+
+## Parameter-ring and switch implementation
+
+Painting order is intentional: an ~5px coral dynamic arc and inactive full ring are composed first at a radius outside the cached PNG/JPEG metal dial; the dial image masks the arc's inner boundary naturally, then only a small red position dot at ~79% body radius renders on the face. Radial value never depends on asset texture. Both knob image and 18×40 transparent slider thumb are decoded one time in `CompLook` (message thread). A 11×22 thumb image is composited in `drawLinearSlider` without creating any new image each frame.
+
+JUCE slider text boxes have been removed for both rotary/linear controls. Dynamic values are exposed via `setTooltip` on value updates; native `setPopupDisplayEnabled(true,false,this)` provides bubble values during drag. This removes 13 persistent numeric boxes from the UI, without changing the host parameter model. Custom L&F switches replace checkbox painting while retaining JUCE ToggleButton and APVTS ButtonAttachment semantics. Lower-panel switches show 9px captions beneath centered tracks; header bypass uses an inversion-aware ACTIVE/BYPASS caption.
+
+## Cached industrial materials, layout, and real-time isolation
+
+`plugin/SurfacePaint.h` centralizes message-thread-only material rendering. `paintBrushedChassis()` produces a grey gradient and repeatable 2px-pitch 2D metal lines on the **single** `metalSurface` bitmap when `resized()` runs; its deterministic hashing cannot affect plugin state. `paintInsetGlass()` draws an opaque almost-black LCD, a recessed bevel, and very subtle top specular edge. The full-sized scope and meter rails are painted into the pre-existing cached `grid` image on resize; the MINI meter LCD frame is baked into `metalSurface`. Runtime 30Hz paints reuse these caches and only update telemetry and lit LED segments.
+
+The main control row now reserves **82px of slider height**, down from 105px, while maintaining seven parameter slots and no permanent value boxes. The full LCD gains ~35px height; the footer is ~106px high and its separate 40px linear-slider components retain at least a 26px-deep black shadow channel surrounding the supplied 22px metallic thumb. Switch captions are rendered to the left of the native ToggleButton-powered capsule tracks, including inverted BYPASS/ACTIVE semantics. Screen metal text remains readable; current dark-mode popup/combobox colors are retained. No shader, blur, worker, audio-thread graphics or DSP modifications.
+
+## Layered gunmetal fader implementation
+
+New binary assets `gunmetal_slider_track.png` (340×57, RGBA) and `gunmetal_slider_thumb_red.png` (58×124, RGBA) are bundled through the existing `juce_add_binary_data(ArSonCompKnobAssets)`. `CompLook` decodes them once on GUI construction. Every JUCE horizontal slider draw uses the same 3-layer compositing sequence:
+1. Stationary gunmetal plate: three source rectangles (37px caps + stretchable centre), fixed 18px rendered endcaps. This preserves plate curvature across 130–170px slider widths without rasterizing/storing a new background for each value.
+2. Value-dependent LED: a small clipped 8px-high slot, with dim outer red, inner bright coral-red and subtle 1.4px highlight. Clamp both LED end and thumb centre to identical limits (x+21..x+w-21). LED is **zero length at minimum** and visibly full at maximum.
+3. Thumb photo in the foreground: 18×37px overlay aligned to slider centre. The red vertical aperture is part of the original approved glowing-thumb image.
+
+All dynamic painting occurs on JUCE GUI thread only. No image decode, texture modification, heap allocation, image cache invalidation, mutex, GPU shader, or engine DSP change per slider motion. Smoke tests check both resources, alpha transparency, visually red level at maximum versus minimum, and pixel-difference from moving photographic thumb.
+
+## Current GUI ownership and rendering contract — reconciliation 2026-10-31
+
+The latest compiled GUI uses 780×640 default, 740×585 minimum, and MINI 330 px high. The `CompLook` object decodes fixed gunmetal slider rail/thumb PNGs, the black rotary-knob JPEG and the matched ON/OFF toggle PNGs as GUI resources. Material backgrounds, black LCD graph and meter rails are cached on resize. Linear slider paint draws stationary metal endcaps/centre, clips the coral-red fill inside its recess, then draws the movable front thumb. ON/OFF asset outer frames are equal size; the Bypass visual meaning is inverted relative to the checkbox parameter (ACTIVE versus BYPASS).
+
+The obsolete JUCE value popup and `TooltipWindow` have been removed. One `view.value.readout` label below the main graph (MINI: right footer) updates from hover/drag and APVTS-backed value notifications, displaying the last selected parameter name, value and unit. This is GUI only: all existing parameter IDs and audio processing remain unchanged. SIDECHAIN filter, detector and toggle control positions are calculated from the editor width rather than fixed x coordinates.
+
+Actual Windows GUI screenshots and CTest passed for code revision `7b340eb2` in [CI #41202549812](https://github.com/masarray/arson-comp/actions/runs/41202549812). Physical host validation remains a separate release gate.

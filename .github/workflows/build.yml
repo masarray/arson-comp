@@ -1,0 +1,57 @@
+name: Validate and build
+on:
+  pull_request:
+    paths: ['engine/**', 'plugin/**', 'assets/**', 'tests/**', 'CMakeLists.txt', 'docs/WINDOWS-QUICKSTART.md', '.github/workflows/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arson-comp-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engine-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DARSON_BUILD_PLUGIN=OFF -DARSON_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+      - run: cmake --build build --parallel 2
+      - run: ctest --test-dir build --output-on-failure
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: build/_deps/juce-src
+          key: juce-8.0.12-29396c22-windows
+      - run: cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --config Release --parallel 4
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - name: Measure engine throughput
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts
+          & ./build/Release/engine_bench.exe | Tee-Object artifacts/benchmark.txt
+      - name: Package install-ready Windows test artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dest = 'artifacts/ArSonComp-Windows-Test'
+          New-Item -ItemType Directory -Force "$dest/Plugin", "$dest/Standalone", "$dest/Screenshots" | Out-Null
+          Copy-Item -Recurse 'build/ArSonComp_artefacts/Release/VST3/ArSonComp.vst3' "$dest/Plugin/"
+          Copy-Item 'build/ArSonComp_artefacts/Release/Standalone/ArSonComp.exe' "$dest/Standalone/"
+          Copy-Item 'docs/WINDOWS-QUICKSTART.md' "$dest/START-HERE.md"
+          Copy-Item 'artifacts/benchmark.txt' "$dest/benchmark.txt"
+          Copy-Item 'build/ArSonComp-preview*.png' "$dest/Screenshots/"
+          $files = Get-ChildItem "$dest/Plugin", "$dest/Standalone" -File -Recurse
+          $files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)  $($_.FullName.Substring((Resolve-Path $dest).Path.Length + 1))" } |
+            Set-Content "$dest/SHA256SUMS.txt" -Encoding ascii
+          "Commit: ${{ github.sha }}" | Set-Content "$dest/BUILD-INFO.txt" -Encoding ascii
+          "CI: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" |
+            Add-Content "$dest/BUILD-INFO.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArSonComp-Windows-x64-ReadyToTest
+          path: artifacts/ArSonComp-Windows-Test/
+          if-no-files-found: error
+          retention-days: 14
