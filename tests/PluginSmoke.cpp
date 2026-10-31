@@ -8,6 +8,8 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <iostream>
 #include <initializer_list>
+#include <cmath>
+#include <algorithm>
 int main(int argc,char** argv) {
     juce::ScopedJuceInitialiser_GUI gui;
     // Quantitative edge-dissolve contract: endpoints transparent, the
@@ -387,28 +389,53 @@ int main(int argc,char** argv) {
     file.deleteFile();
     juce::AudioBuffer<float> buffer(2,128);juce::MidiBuffer midi;
     for(int j=0;j<1000;++j) {buffer.clear();buffer.setSample(0,0,0.5f);processor.processBlock(buffer,midi);}
-    // Full toolbar geometry across minimum/default/wide editor widths:
-    // consistent 10px gaps, uniform baseline and bounded preset dropdown.
-    for(const int width : {740,780,900,1200}) {
+    // WCAG contrast checks for both caption layers at their real materials.
+    // These deliberately fail if captions regress to faint gray on gray.
+    {
+        const auto luminance=[](juce::Colour c) {
+            const auto channel=[](float v) {
+                return v<=0.04045f ? v/12.92f:
+                    std::pow((v+0.055f)/1.055f,2.4f);
+            };
+            return 0.2126f*channel(c.getFloatRed())+
+                   0.7152f*channel(c.getFloatGreen())+
+                   0.0722f*channel(c.getFloatBlue());
+        };
+        const auto contrast=[&](juce::Colour fg,juce::Colour bg) {
+            const auto a=luminance(fg),b=luminance(bg);
+            return (std::max(a,b)+0.05f)/(std::min(a,b)+0.05f);
+        };
+        if(contrast(juce::Colour{arson::ui::EditorMetrics::controlCaptionRgb},
+                    juce::Colour{arson::ui::EditorMetrics::metalBackgroundRgb})<4.5f ||
+           contrast(juce::Colour{arson::ui::EditorMetrics::captionRgb},
+                    juce::Colour{arson::ui::EditorMetrics::headerBackgroundRgb})<4.5f)
+            return 66;
+    }
+    // Header invariants for minimum, default, legacy and maximum widths.
+    for(const int width : {660,704,780,1040}) {
         const auto h=arson::ui::HeaderLayout::calculate(width);
         const std::array<juce::Rectangle<int>,7> fields{
             h.logo,h.mini,h.model,h.preset,h.compare,h.file,h.bypass};
-        if(h.preset.getWidth()<144||h.preset.getWidth()>176||
-           h.bypass.getRight()!=width-14||h.logo.getX()!=14)return 62;
+        if(h.preset.getWidth()<124||h.preset.getWidth()>154||
+           h.bypass.getRight()!=width-12||h.logo.getX()!=12)return 62;
         for(std::size_t i=1;i<fields.size();++i) {
-            if(fields[i].getX()-fields[i-1].getRight()<10 ||
-               fields[i].getRight()>width-14 ||
+            if(fields[i].getX()-fields[i-1].getRight()<8 ||
+               fields[i].getRight()>width-12 ||
                fields[i].getWidth()<=0)return 63;
-            if(fields[i].getY()!=24||fields[i].getHeight()!=28)return 64;
+            if(fields[i].getY()!=22||fields[i].getHeight()!=27)return 64;
         }
     }
     for(int iteration=0;iteration<8;++iteration) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+        if(iteration==0 &&
+           (editor->getWidth()!=arson::ui::EditorMetrics::defaultWidth ||
+            editor->getHeight()!=arson::ui::EditorMetrics::defaultHeight))
+            return 68;
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
-        editor->setSize(iteration%2 ? 740 : 780,iteration%2 ? 585 : 640);
-        if(editor->getWidth()!=(iteration%2 ? 740 : 780) ||
-           editor->getHeight()!=(iteration%2 ? 585 : 640))return 9;
+        editor->setSize(iteration%2 ? 660 : 704,iteration%2 ? 490 : 520);
+        if(editor->getWidth()!=(iteration%2 ? 660 : 704) ||
+           editor->getHeight()!=(iteration%2 ? 490 : 520))return 9;
         auto* threshold=editor->findChildWithID("param.threshold");
         auto* input=editor->findChildWithID("param.input");
         auto* ratio=editor->findChildWithID("param.ratio");
@@ -423,10 +450,10 @@ int main(int argc,char** argv) {
             // No floating tooltip obscures the hardware control strip.
             if(!slider->getTooltip().isEmpty())return 49;
         }
-        // Opaque live meter canvas isolates timer repaints from chassis.
         auto* canvas=editor->findChildWithID("view.graph.canvas");
-        const auto expectedCanvas=juce::Rectangle<int>{
-            8,70,editor->getWidth()-16,editor->getHeight()-268};
+        const auto expectedCanvas=juce::Rectangle<int>{8,
+            arson::ui::EditorMetrics::displayTop,editor->getWidth()-16,
+            editor->getHeight()-arson::ui::EditorMetrics::displayBottomReserve};
         if(!canvas || !canvas->isVisible() || !canvas->isOpaque() ||
            canvas->getBounds()!=expectedCanvas)return 70;
         auto* readout=dynamic_cast<juce::Label*>(
@@ -470,6 +497,12 @@ int main(int argc,char** argv) {
         if(!hp||!lp||!detector||!autoMode||!external||!listen||
            !style||!presets||!save||!load||!file||!compare||!bypass||
            !dynTab||!scTab||!range||!mix)return 21;
+        // Footer controls and the 7 primary rotary knobs must never collide
+        // at the new compact minimum height.
+        if(input->getBottom()+5>dynTab->getY() ||
+           threshold->getBottom()+5>dynTab->getY() ||
+           dynTab->getBottom()>range->getY()+1 ||
+           scTab->getBottom()>mix->getY()+1)return 67;
         // Actual JUCE component positions must match the shared header grid;
         // this catches collisions and regressions in MINI/FULL resizing.
         const auto header=arson::ui::HeaderLayout::calculate(editor->getWidth());
@@ -568,8 +601,7 @@ int main(int argc,char** argv) {
             if(!mini || !mini->onClick)return 10;
             mini->onClick();
             if(editor->getHeight()!=330)return 11;
-            if(canvas->getBounds()!=juce::Rectangle<int>{
-                13,258,editor->getWidth()-26,47})return 71;
+            if(canvas->getBounds()!=juce::Rectangle<int>{13,258,editor->getWidth()-26,47})return 71;
             auto compactImage=editor->createComponentSnapshot(editor->getLocalBounds());
             if(compactImage.isNull() || compactImage.getHeight()!=330)return 12;
             if(argc>1) {
@@ -579,10 +611,10 @@ int main(int argc,char** argv) {
                 if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
             }
             mini->onClick();
-            if(editor->getHeight()!=640)return 14;
-            if(canvas->getBounds()!=juce::Rectangle<int>{
-                8,70,editor->getWidth()-16,editor->getHeight()-268})
-                return 72;
+            if(editor->getHeight()!=520)return 14;
+            if(canvas->getBounds()!=juce::Rectangle<int>{8,
+                arson::ui::EditorMetrics::displayTop,editor->getWidth()-16,
+                editor->getHeight()-arson::ui::EditorMetrics::displayBottomReserve})return 72;
         }
         auto image=editor->createComponentSnapshot(editor->getLocalBounds());
         if(image.isNull())return 3;

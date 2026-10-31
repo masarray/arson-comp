@@ -19,7 +19,7 @@ Run `Standalone/ArSonComp.exe`. Select the input/output device in the standalone
 - Vocal: listen for pumping, sibilance, level consistency and dry/wet behavior.
 - Bass: use low frequencies and aggressive attack to check distortion and filter interactions.
 - Transients: check drums with attack/hold/release; zero lookahead is not a true-peak limiter.
-- UI: switch MINI/FULL; resize to 740x585 and 780x640, then try a larger window. Confirm bottom LCD value readout, labels, metering, and HP/LP controls.
+- UI: switch MINI/FULL; resize to 660x490 and 704x520, then try a larger window. Confirm bottom LCD value readout, labels, metering, and HP/LP controls.
 - Project: save, close, reload; confirm host parameters, style, bypass and input/output routing.
 - For performance, use multiple instances in your host and compare CPU with plugin editors hidden/visible.
 
@@ -35,7 +35,7 @@ Check upper central transfer graph, red fading curve and live gain reduction lin
 
 ### Compact responsive GUI and bottom-of-LCD value display
 
-The editor now defaults to **780×640**, with **740×585** minimum full size and **330px** high MINI. FULL restores the preceding expanded dimensions. The primary rotary row is shorter, Sidechain positions adapt to the editor width, and the actual meter/graph canvas retains useful space.
+The editor now defaults to **704×520**, with **660×490** minimum full size and **330px** high MINI. FULL restores the preceding expanded dimensions. The primary rotary row is shorter, Sidechain positions adapt to the editor width, and the actual meter/graph canvas retains useful space.
 
 Hover or drag **any** rotary knob or horizontal slider to show its name, exact value and unit in the **bottom centre of the black LCD**. The last focused value remains visible rather than flashing away. MINI uses the right-hand footer for the readout. There are **no overlay value bubbles or TooltipWindow**, so nothing obscures the controls. Double-click a knob or slider to restore its factory value. The JUCE APVTS host-automation attachments and audio DSP remain unchanged.
 
@@ -58,3 +58,7 @@ All rotary knobs retain their coral sector behind the black brushed-metal face a
 ### Premium brushed-metal and glass UI
 
 The updated full editor should now have a horizontally brushed grey metal background and a recessed jet-black LCD for the dynamics history/transfer graph and segmented IN/GR/OUT meters. The knob area is shorter, leaving more room for the screen. Range/Hold/Mix/Link/HP/LP rails have a deep shadowed well sized to the original metallic thumb; all toggle captions appear on the left of their switches, including ACTIVE/BYPASS in the header. Both DYNAMICS and SIDECHAIN pages, MINI, old presets/automation and all audio routes continue working. No plugin audio processing or added algorithmic sample delay has changed.
+
+### M4 compact, readable chassis
+
+The editor now defaults to **704×520**, with **660×490** as the minimum FULL layout and an unchanged 330px-high MINI view. Compared with the old 780×640 default, the window consumes approximately 27% less screen area without indiscriminately shrinking knobs. All header separators and unnecessary overline captions are removed; the only header captions are MODEL and PRESET. Brushed panel label contrast is checked by automated WCAG-style tests (>=4.5:1 against dark metal reference). The preset remains width-bounded. The footer technical slogan has been removed to prioritize the live value readout. Test at both minimum/default size and with the SIDECHAIN tab selected.
