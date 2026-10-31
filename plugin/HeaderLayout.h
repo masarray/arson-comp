@@ -8,7 +8,7 @@ namespace arson::ui {
 // text/knobs down. Reused by the editor renderer and the Windows smoke tests.
 struct EditorMetrics {
     // Dense-but-usable hardware UI: 612px default instead of 704px.
-    // Main knobs keep a 62px drawing/drag target and readable 11px captions.
+    // Main knobs retain 58px hit targets and readable 10.4pt captions.
     static constexpr int minWidth=580, minHeight=480;
     static constexpr int defaultWidth=612, defaultHeight=500;
     static constexpr int maxWidth=1000, maxHeight=760;
@@ -16,6 +16,12 @@ struct EditorMetrics {
     static constexpr int headerHeight=62, displayTop=64;
     static constexpr int displayBottomReserve=254;
     static constexpr int bottomControlsReserve=86;
+    // Single control geometry/typography contract; JUCE smoke uses these.
+    static constexpr float headerCaptionFont=9.5f;
+    static constexpr float buttonFont=11.0f;
+    static constexpr float controlCaptionFont=10.4f;
+    static constexpr int knobCaptionOffset=2, knobTopOffset=26, knobHeight=58;
+    static constexpr int faderCaptionOffset=25, faderTopOffset=44, faderHeight=34;
     static constexpr juce::uint32 captionRgb=0xffd9e0e3;
     static constexpr juce::uint32 controlCaptionRgb=0xffe4e9ec;
     static constexpr juce::uint32 headerBackgroundRgb=0xff292d30;

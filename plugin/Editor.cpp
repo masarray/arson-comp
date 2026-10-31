@@ -5,6 +5,7 @@
 #include "SurfacePaint.h"
 #include "GraphHistory.h"
 #include "HeaderLayout.h"
+#include "FaderGeometry.h"
 #include "BinaryData.h"
 #include <cmath>
 #include <algorithm>
@@ -59,13 +60,6 @@ CompLook::CompLook() {
         BinaryData::gunmetal_slider_thumb_red_png,
         static_cast<std::size_t>(BinaryData::gunmetal_slider_thumb_red_pngSize));
     jassert(sliderTrack.isValid() && sliderThumb.isValid());
-    if(sliderTrack.isValid()) {
-        constexpr int cap=37;
-        const int width=sliderTrack.getWidth(),height=sliderTrack.getHeight();
-        sliderCapLeft=sliderTrack.getClippedImage({0,0,cap,height});
-        sliderCentre=sliderTrack.getClippedImage({cap,0,width-2*cap,height});
-        sliderCapRight=sliderTrack.getClippedImage({width-cap,0,cap,height});
-    }
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colour{0xff31383e});
@@ -86,6 +80,9 @@ CompLook::CompLook() {
         juce::Colour{arson::ui::EditorMetrics::controlCaptionRgb});
 }
 // Satin-finished combo surfaces: recessed but legible on a brushed chassis.
+juce::Font CompLook::getTextButtonFont(juce::TextButton&,int) {
+    return juce::Font(juce::FontOptions(arson::ui::EditorMetrics::buttonFont));
+}
 void CompLook::drawComboBox(juce::Graphics& g,int width,int height,bool down,
                             int buttonX,int buttonY,int buttonW,int buttonH,
                             juce::ComboBox& box) {
@@ -113,7 +110,7 @@ void CompLook::drawComboBox(juce::Graphics& g,int width,int height,bool down,
 }
 void CompLook::positionComboBoxText(juce::ComboBox& box,juce::Label& label) {
     label.setBounds(11,1,juce::jmax(0,box.getWidth()-36),box.getHeight()-2);
-    label.setFont(juce::FontOptions(11.5f));
+    label.setFont(juce::FontOptions(arson::ui::EditorMetrics::buttonFont));
     label.setJustificationType(juce::Justification::centredLeft);
 }
 void CompLook::drawButtonBackground(juce::Graphics& g,juce::Button& button,
@@ -208,61 +205,81 @@ void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
 void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float,float,
                                  const juce::Slider::SliderStyle,juce::Slider&) {
-    const float cy=static_cast<float>(y)+static_cast<float>(h)*0.50f;
-    const float plateX=static_cast<float>(x)+2.0f;
-    const float plateW=static_cast<float>(w)-4.0f;
-    constexpr float plateH=30.0f;
-    // Photo plate is stationary. Nine-slice horizontally (3 segments)
-    // preserves realistic endcaps at both the short and 170px SC sliders.
+    // Draw the *whole* 340x57 track and the 58x124 thumb at the SAME
+    // proportional scale. A resized window changes size, not aspect ratio.
+    // All geometry is float arithmetic; there is no allocation/cache churn.
+    const auto geometry=arson::ui::FaderGeometry::calculate(
+        static_cast<float>(w),static_cast<float>(h),pos);
+    const auto track=geometry.track.translated(static_cast<float>(x),
+                                               static_cast<float>(y));
+    const auto thumb=geometry.thumb.translated(static_cast<float>(x),
+                                               static_cast<float>(y));
+    const float cy=static_cast<float>(y)+static_cast<float>(h)*0.5f;
+    const float left=geometry.left+static_cast<float>(x);
+    const float right=geometry.right+static_cast<float>(x);
+    const float position=geometry.position+static_cast<float>(x);
+    // The native track art is intentionally ~6:1. At an 85px control
+    // it becomes just 14px tall. A bounded *independent* metal housing
+    // restores the physical fader's depth without stretching either PNG.
+    // All geometry stays within the component; no image/cache allocation.
+    const float housingH=juce::jmin(23.0f,static_cast<float>(h)-6.0f);
+    const auto housing=juce::Rectangle<float>{
+        track.getX()-3.0f,cy-housingH*0.5f,track.getWidth()+6.0f,housingH};
+    g.setColour(juce::Colour{0xff262c31});
+    g.fillRoundedRectangle(housing,4.5f);
+    g.setColour(juce::Colour{0xff717a80}.withAlpha(0.42f));
+    g.drawRoundedRectangle(housing.reduced(0.5f),4.5f,0.9f);
+    g.setColour(juce::Colours::white.withAlpha(0.085f));
+    g.drawHorizontalLine(juce::roundToInt(housing.getY()+2.5f),
+        housing.getX()+5.0f,housing.getRight()-5.0f);
     if(sliderTrack.isValid()) {
-        constexpr float dstCap=18.0f;
-        const float top=cy-plateH*0.5f;
-        const float midW=juce::jmax(0.0f,plateW-2.0f*dstCap);
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        // JUCE 8's Graphics::drawImage takes a target Rectangle and optional
-        // RectanglePlacement, NOT a source Rectangle. Preclip these three
-        // views once in CompLook constructor, never inside paint().
-        g.drawImage(sliderCapLeft,
-            juce::Rectangle<float>{plateX,top,dstCap,plateH});
-        g.drawImage(sliderCentre,
-            juce::Rectangle<float>{plateX+dstCap,top,midW,plateH});
-        g.drawImage(sliderCapRight,
-            juce::Rectangle<float>{plateX+plateW-dstCap,top,dstCap,plateH});
+        g.drawImage(sliderTrack,track);
     } else {
-        g.setColour(juce::Colour{0xff282d31});
-        g.fillRoundedRectangle(plateX,cy-14.0f,plateW,28.0f,7.0f);
+        g.setColour(juce::Colour{0xff292f33});
+        g.fillRoundedRectangle(track,track.getHeight()*0.35f);
     }
-
-    // Use the same travel limits for the bright level and moving thumb.
-    // The LED is INSIDE the dark photo slot, not a red slider drawn
-    // over the brushed metal. At minimum it is genuinely extinguished.
-    const float left=static_cast<float>(x)+21.0f;
-    const float right=static_cast<float>(x+w)-21.0f;
-    const float cx=juce::jlimit(left,right,pos);
-    if(cx>left+0.3f) {
+    // Recessed LED level remains clipped inside the proportional track
+    // and always uses the same thumb travel. Minimum has no red fill.
+    if(position>left+0.3f) {
         juce::Graphics::ScopedSaveState scope(g);
-        juce::Path slot;
-        slot.addRoundedRectangle(left,cy-4.0f,right-left,8.0f,3.2f);
-        g.reduceClipRegion(slot);
-        g.setColour(juce::Colour{0xff922731}.withAlpha(0.40f));
-        g.fillRoundedRectangle(left,cy-4.0f,cx-left,8.0f,3.5f);
+        const float ledH=juce::jmax(3.0f,track.getHeight()*0.29f);
+        const float ledY=cy-ledH*0.5f;
+        juce::Path recess;
+        recess.addRoundedRectangle(left,ledY,right-left,ledH,ledH*0.45f);
+        g.reduceClipRegion(recess);
         g.setGradientFill(juce::ColourGradient(
-            juce::Colour{0xffff6774}.withAlpha(0.98f),left,cy-2.6f,
-            juce::Colour{0xffa62038}.withAlpha(0.90f),left,cy+3.5f,false));
-        g.fillRoundedRectangle(left,cy-2.8f,cx-left,5.6f,2.8f);
-        g.setColour(juce::Colour{0xffff9197}.withAlpha(0.55f));
-        g.fillRect(left,cy-0.7f,cx-left,1.4f);
+            juce::Colour{0xffff6b79},left,ledY,
+            juce::Colour{0xff9e2433},left,ledY+ledH,false));
+        g.fillRect(left,ledY,position-left,ledH);
+        g.setColour(juce::Colour{0xffffb0b6}.withAlpha(0.46f));
+        g.fillRect(left,cy-0.55f,position-left,1.1f);
     }
-    // The thumb is the FRONT layer. Only its x position moves with the
-    // JUCE slider value; the chassis, glass and audio thread never move.
+    // A proportional photographic thumb is too dark against the new chassis
+    // at 580-612px. Give it a bright metal silhouette and a tactile centre
+    // marker UNDER/OVER the original asset (never stretch or replace it).
+    // This makes the current value visible even when the LED fill is zero.
+    const auto thumbBack=thumb.expanded(1.2f,0.4f);
+    g.setColour(juce::Colour{0xffabb6bb});
+    g.fillRoundedRectangle(thumbBack,2.5f);
+    g.setColour(juce::Colour{0xff11181c});
+    g.fillRoundedRectangle(thumbBack.reduced(1.1f),2.0f);
     if(sliderThumb.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImage(sliderThumb,
-            juce::Rectangle<float>{cx-9.0f,cy-18.5f,18.0f,37.0f});
+        g.drawImage(sliderThumb,thumb);
     } else {
-        g.setColour(juce::Colour{0xffa8afb1});
-        g.fillRoundedRectangle(cx-8.0f,cy-17.0f,16.0f,34.0f,4.0f);
+        g.setColour(juce::Colour{0xff929fa5});
+        g.fillRoundedRectangle(thumb,2.5f);
     }
+    // Draw a narrow light-catching ridge over the image. The centre marker
+    // must move with thumb at both extremes and at all supported widths.
+    const float ridgeX=thumb.getCentreX();
+    g.setColour(juce::Colour{0xffc8d0d2}.withAlpha(0.9f));
+    g.drawVerticalLine(juce::roundToInt(ridgeX),thumb.getY()+3.0f,
+                       thumb.getBottom()-3.0f);
+    g.setColour(juce::Colour{0xff5f6a70}.withAlpha(0.8f));
+    g.drawVerticalLine(juce::roundToInt(ridgeX+2.0f),
+                       thumb.getY()+4.0f,thumb.getBottom()-4.0f);
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
                                  bool highlighted,bool down) {
@@ -286,9 +303,9 @@ void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
     // The sprite already says ON/OFF; the adjacent caption identifies
     // the affected compressor function without repeating that state.
     const juce::String caption=bypassControl
-        ? (active?"ACTIVE":"BYPASS") : button.getButtonText();
+        ? (active?"Active":"Bypass") : button.getButtonText();
     g.setColour(juce::Colour{0xffe3e6e5});
-    g.setFont(juce::FontOptions(9.4f));
+    g.setFont(juce::FontOptions(10.0f));
     g.drawText(caption,0,0,juce::jmax(0,static_cast<int>(tx)-5),
         button.getHeight(),juce::Justification::centredRight,false);
     if(highlighted||down) {
@@ -299,12 +316,8 @@ void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
 Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.snapshot()) {
     setLookAndFeel(&look);
     setOpaque(true);
-    // One-time UI-thread decode of the high-contrast brushed embossed wordmark.
-    // Embedded via BinaryData: no runtime file I/O or audio impact.
-    headerLogo=juce::ImageFileFormat::loadFrom(
-        BinaryData::arsoncomp_header_logo_png,
-        static_cast<std::size_t>(BinaryData::arsoncomp_header_logo_pngSize));
-    jassert(headerLogo.isValid());
+    // Crisp vector-font wordmark replaces a low-contrast bitmap in the
+    // tight 88px header; photo knob/slider assets remain predecoded.
     const std::array<std::size_t,6> bars{{arson::Range,arson::Hold,arson::Mix,
         arson::Link,arson::Highpass,arson::Lowpass}};
     for(std::size_t i=0;i<knobs.size();++i) {
@@ -334,7 +347,8 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         if(i==arson::Lowpass) shortLabel="LP";
         if(i==arson::Link) shortLabel="LINK";
         labels[i].setText(shortLabel,juce::dontSendNotification);
-        labels[i].setFont(juce::FontOptions(11.3f));
+        labels[i].setComponentID("caption."+juce::String(spec.id));
+        labels[i].setFont(juce::FontOptions(arson::ui::EditorMetrics::controlCaptionFont));
         labels[i].setColour(juce::Label::textColourId,
             juce::Colour{arson::ui::EditorMetrics::controlCaptionRgb});
         labels[i].setJustificationType(juce::Justification::centred);
@@ -495,6 +509,10 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     sidechainTab.onClick=[this]{sidechainPanel=true;syncPanelVisibility();};
     addAndMakeVisible(dynamicsTab);
     addAndMakeVisible(sidechainTab);
+    compact.setButtonText("Mini");
+    fileMenu.setButtonText("File");
+    dynamicsTab.setButtonText("Dynamics");
+    sidechainTab.setButtonText("Sidechain");
     compact.setComponentID("view.compact");
     compact.onClick=[this] {
         compactMode=!compactMode;
@@ -504,14 +522,14 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
                 arson::ui::EditorMetrics::miniHeight,
                 arson::ui::EditorMetrics::maxWidth,
                 arson::ui::EditorMetrics::miniHeight);
-            compact.setButtonText("FULL");
+            compact.setButtonText("Full");
             setSize(expandedWidth,arson::ui::EditorMetrics::miniHeight);
         } else {
             setResizeLimits(arson::ui::EditorMetrics::minWidth,
                 arson::ui::EditorMetrics::minHeight,
                 arson::ui::EditorMetrics::maxWidth,
                 arson::ui::EditorMetrics::maxHeight);
-            compact.setButtonText("MINI");
+            compact.setButtonText("Mini");
             setSize(expandedWidth,expandedHeight);
         }
     };
@@ -827,8 +845,10 @@ void Editor::resized() {
         arson::Release,arson::Threshold,arson::Ratio,arson::Knee,arson::Makeup};
     for(std::size_t k=0;k<main.size();++k) {
         const auto i=main[k];const int x=14+static_cast<int>(k)*cell;
-        labels[i].setBounds(x,mainY+3,cell,17);
-        knobs[i].setBounds(x+3,mainY+20,cell-6,62);
+        labels[i].setBounds(x,mainY+arson::ui::EditorMetrics::knobCaptionOffset,
+                            cell,15);
+        knobs[i].setBounds(x+3,mainY+arson::ui::EditorMetrics::knobTopOffset,
+                           cell-6,arson::ui::EditorMetrics::knobHeight);
     }
 
     const int bottomY=compactMode?166:
@@ -836,15 +856,17 @@ void Editor::resized() {
     dynamicsTab.setBounds(16,bottomY+1,92,23);
     sidechainTab.setBounds(114,bottomY+1,94,23);
     // Main tab: four comfortable controls, plus a dedicated AUTO control.
-    const int slot=(w-190)/4;
+    const int slot=(w-176)/4;
     constexpr std::array<std::size_t,4> dynamics{arson::Range,arson::Hold,
         arson::Mix,arson::Link};
     for(std::size_t k=0;k<dynamics.size();++k) {
-        const auto i=dynamics[k];const int x=16+static_cast<int>(k)*slot;
-        labels[i].setBounds(x,bottomY+25,slot-10,15);
-        knobs[i].setBounds(x+5,bottomY+38,slot-18,40);
+        const auto i=dynamics[k];const int x=14+static_cast<int>(k)*slot;
+        labels[i].setBounds(x,bottomY+arson::ui::EditorMetrics::faderCaptionOffset,
+                            slot-5,14);
+        knobs[i].setBounds(x+3,bottomY+arson::ui::EditorMetrics::faderTopOffset,
+                           slot-10,arson::ui::EditorMetrics::faderHeight);
     }
-    autoRelease.setBounds(w-153,bottomY+42,139,28);
+    autoRelease.setBounds(w-145,bottomY+46,132,27);
 
     // Sidechain tab: only detector-specific controls are painted.
     constexpr std::array<std::size_t,2> filters{arson::Highpass,arson::Lowpass};
@@ -859,13 +881,15 @@ void Editor::resized() {
     const int filterStart=16;
     for(std::size_t k=0;k<filters.size();++k) {
         const auto i=filters[k];const int x=filterStart+static_cast<int>(k)*filterSlot;
-        labels[i].setBounds(x,bottomY+25,filterSlot-8,15);
-        knobs[i].setBounds(x+2,bottomY+38,filterSlot-8,40);
+        labels[i].setBounds(x,bottomY+arson::ui::EditorMetrics::faderCaptionOffset,
+                            filterSlot-8,14);
+        knobs[i].setBounds(x+2,bottomY+arson::ui::EditorMetrics::faderTopOffset,
+                           filterSlot-8,arson::ui::EditorMetrics::faderHeight);
     }
     const int detX=filterStart+filterSlot*2+8;
-    detector.setBounds(detX,bottomY+43,detW,27);
-    external.setBounds(detX+detW+8,bottomY+42,extW,30);
-    listen.setBounds(detX+detW+extW+16,bottomY+42,listenW,30);
+    detector.setBounds(detX,bottomY+47,detW,27);
+    external.setBounds(detX+detW+8,bottomY+46,extW,28);
+    listen.setBounds(detX+detW+extW+16,bottomY+46,listenW,28);
     const int readoutW=juce::jmin(254,w-40);
     graphCanvas.setBounds(compactMode
         ? juce::Rectangle<int>{13,258,w-26,47} : display);
@@ -1058,19 +1082,17 @@ void Editor::paint(juce::Graphics& g) {
     g.fillRect(0,0,getWidth(),arson::ui::EditorMetrics::headerHeight);
     // Single-line embossed brand and a quiet, consistent overline hierarchy.
     const auto header=arson::ui::HeaderLayout::calculate(getWidth());
-    if(headerLogo.isValid()) {
-        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImageWithin(headerLogo,header.logo.getX(),header.logo.getY(),
-            header.logo.getWidth(),header.logo.getHeight(),
-            juce::RectanglePlacement::centred);
-    } else {
-        g.setColour(text);
-        g.setFont(juce::FontOptions(17.0f));
-        g.drawText("ArSonComp",header.logo,juce::Justification::centredLeft);
-    }
+    // Same crisp native font for the brand, toolbar and controls.
+    // The previous dark embossed bitmap became illegible at 612px.
+    g.setFont(juce::FontOptions(14.0f));
+    g.setColour(juce::Colours::black.withAlpha(0.48f));
+    g.drawText("ArSonComp",header.logo.translated(0,1),
+               juce::Justification::centredLeft,true);
+    g.setColour(juce::Colour{0xffd6dee1});
+    g.drawText("ArSonComp",header.logo,juce::Justification::centredLeft,true);
     // Labels only for dropdowns; the other buttons identify themselves.
     g.setColour(juce::Colour{arson::ui::EditorMetrics::captionRgb});
-    g.setFont(juce::FontOptions(9.5f));
+    g.setFont(juce::FontOptions(arson::ui::EditorMetrics::headerCaptionFont));
     const auto caption=[&g](const char* title,const juce::Rectangle<int>& r) {
         g.drawText(title,r.getX()+1,7,r.getWidth()-2,12,
             juce::Justification::centredLeft,false);

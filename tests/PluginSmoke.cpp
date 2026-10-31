@@ -1,6 +1,7 @@
 #include "../plugin/Processor.h"
 #include "../plugin/Editor.h"
 #include "../plugin/HeaderLayout.h"
+#include "../plugin/FaderGeometry.h"
 #include "../plugin/PresetIO.h"
 #include "../plugin/FactoryPresetBank.h"
 #include "../plugin/GraphPaint.h"
@@ -231,6 +232,19 @@ static int runSmoke(int argc,char** argv) {
             return 47;
         }
 
+        // Maintain native track/thumb aspect ratio at every window width.
+        for(float width : {70.0f,90.0f,105.0f,150.0f}) {
+            for(float height : {34.0f,40.0f}) {
+                const auto shape=arson::ui::FaderGeometry::calculate(width,height,width*0.5f);
+                if(std::abs(shape.track.getWidth()/shape.track.getHeight()-340.0f/57.0f)>0.001f ||
+                   std::abs(shape.thumb.getWidth()/shape.thumb.getHeight()-58.0f/124.0f)>0.001f ||
+                   shape.track.getX()<0 || shape.track.getRight()>width ||
+                   shape.thumb.getY()<0 || shape.thumb.getBottom()>height ||
+                   shape.left>=shape.right) {
+                    std::cerr<<"FADER_ASPECT_RATIO_73 w="<<width<<"\n";return 73;
+                }
+            }
+        }
         // Raster-render all three slider positions via the *production*
         // LookAndFeel, then inspect the LED at a track location untouched
         // by the thumb. Red must be off at minimum and lit at maximum.
@@ -250,6 +264,16 @@ static int runSmoke(int argc,char** argv) {
         const auto low=render(21.0f);
         const auto mid=render(80.0f);
         const auto high=render(139.0f);
+        // The scaled 6:1 track needs a separate visible metal bezel,
+        // otherwise short Dynamics controls look like flat red hairlines.
+        // Sample above the PNG track, inside the 23px bezel.
+        const auto housingPixel=low.getPixelAt(61,10);
+        const auto backdrop=juce::Colour{0xff44494d};
+        if(housingPixel.getBrightness()>=backdrop.getBrightness()-0.045f) {
+            std::cerr<<"FADER_HOUSING_DEPTH_78 pixel="
+                     <<housingPixel.toDisplayString(true)<<"\n";
+            return 78;
+        }
         const auto off=low.getPixelAt(61,20);
         const auto on=high.getPixelAt(61,20);
         if(on.getRed()<=off.getRed()+35 ||
@@ -543,10 +567,21 @@ static int runSmoke(int argc,char** argv) {
         thresholdSlider->setValue(-23.0,juce::sendNotificationSync);
         if(!readout->getText().contains("-23.0"))return 57;
         if(threshold->getBounds().intersects(ratio->getBounds()))return 20;
+        for(const char* name : {"input","attack","release","threshold",
+                                "ratio","knee","makeup"}) {
+            const auto* caption=editor->findChildWithID("caption."+juce::String(name));
+            const auto* knob=editor->findChildWithID("param."+juce::String(name));
+            if(!caption || !knob || knob->getY()-caption->getBottom()<7 ||
+               knob->getBounds().intersects(caption->getBounds())) {
+                std::cerr<<"KNOB_CAPTION_OVERLAP_74 "<<name<<"\n";return 74;
+            }
+        }
         // New compact primary knob row: height budget for larger black LCD
         // without collapsing control interaction areas at minimum size.
-        if(threshold->getHeight()!=62 || input->getHeight()!=62 ||
-           attack->getHeight()!=62 || ratio->getHeight()!=62) {
+        if(threshold->getHeight()!=arson::ui::EditorMetrics::knobHeight ||
+           input->getHeight()!=arson::ui::EditorMetrics::knobHeight ||
+           attack->getHeight()!=arson::ui::EditorMetrics::knobHeight ||
+           ratio->getHeight()!=arson::ui::EditorMetrics::knobHeight) {
             std::cerr<<"COMPACT_KNOB_HEIGHT_52 "<<threshold->getHeight()
                 <<", "<<input->getHeight()<<", "<<attack->getHeight()
                 <<", "<<ratio->getHeight()<<'\n';
@@ -590,6 +625,21 @@ static int runSmoke(int argc,char** argv) {
            compare->getBounds()!=header.compare ||
            file->getBounds()!=header.file ||
            bypass->getBounds()!=header.bypass)return 65;
+        const auto* miniButton=dynamic_cast<const juce::TextButton*>(mini);
+        const auto* fileButton=dynamic_cast<const juce::TextButton*>(file);
+        const auto* dynButton=dynamic_cast<const juce::TextButton*>(dynTab);
+        const auto* scButton=dynamic_cast<const juce::TextButton*>(scTab);
+        if(!miniButton||miniButton->getButtonText()!="Mini"||
+           !fileButton||fileButton->getButtonText()!="File"||
+           !dynButton||dynButton->getButtonText()!="Dynamics"||
+           !scButton||scButton->getButtonText()!="Sidechain")return 75;
+        for(const char* name : {"range","hold","mix","link"}) {
+            const auto* caption=editor->findChildWithID("caption."+juce::String(name));
+            const auto* fader=editor->findChildWithID("param."+juce::String(name));
+            if(!caption||!fader||fader->getY()-caption->getBottom()<4||
+               fader->getHeight()!=arson::ui::EditorMetrics::faderHeight||
+               fader->getBottom()>editor->getHeight()-5)return 76;
+        }
         // File controls are deliberately not mounted in the visible header.
         // Both independent tab views must have unclipped, non-overlapping
         // active controls at 740 and 780px.
@@ -631,6 +681,12 @@ static int runSmoke(int argc,char** argv) {
                 editor->findChildWithID("view.dynamics.tab"));
             if(!tab||!mainTab||!tab->onClick||!mainTab->onClick)return 29;
             tab->onClick();
+            for(const char* name : {"highpass","lowpass"}) {
+                const auto* caption=editor->findChildWithID("caption."+juce::String(name));
+                const auto* fader=editor->findChildWithID("param."+juce::String(name));
+                if(!caption||!fader||fader->getY()-caption->getBottom()<4||
+                   fader->getHeight()!=arson::ui::EditorMetrics::faderHeight)return 77;
+            }
             if(!hp->isVisible()||!lp->isVisible()||!detector->isVisible()||
                !external->isVisible()||!listen->isVisible()||
                range->isVisible()||mix->isVisible()||autoMode->isVisible()||

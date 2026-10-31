@@ -11,6 +11,7 @@ public:
     void positionComboBoxText(juce::ComboBox&,juce::Label&) override;
     void drawButtonBackground(juce::Graphics&,juce::Button&,
                               const juce::Colour&,bool,bool) override;
+    juce::Font getTextButtonFont(juce::TextButton&,int) override;
     juce::Label* createSliderTextBox(juce::Slider&) override;
     void drawRotarySlider(juce::Graphics&,int,int,int,int,float,float,float,juce::Slider&) override;
     void drawLinearSlider(juce::Graphics&,int,int,int,int,float,float,float,
@@ -22,7 +23,6 @@ private:
     juce::Image sourceFace; // decoded once on GUI initialization
     juce::Image toggleOn, toggleOff; // matched, predecoded state sprites
     juce::Image sliderTrack, sliderThumb; // layered photographic gunmetal assets, decoded once
-    juce::Image sliderCapLeft, sliderCentre, sliderCapRight; // pre-clipped once; no per-paint allocations
     const juce::Image& knobFace(int diameter,bool primary);
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {
@@ -128,7 +128,6 @@ private:
     int currentChannels=2;
     juce::Rectangle<int> display;
     juce::Image grid,metalSurface; // cached full chassis and black glass LCD
-    juce::Image headerLogo; // cropped transparent metal/LED brand mark, decoded once
     juce::Path transferCurve,transferShade;
     juce::Path inputHistory,outputHistory,reductionHistory,reductionArea;
     // Six cached horizontal gradient brushes: input, output, GR, transfer,
