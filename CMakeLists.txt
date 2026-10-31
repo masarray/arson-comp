@@ -4,6 +4,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(ARSON_BUILD_PLUGIN "Build VST3 and standalone" ON)
 option(ARSON_SANITIZE "Enable address/undefined sanitizers for engine tests" OFF)
+# JUCE defaults JUCE_ASIO=0. Native Maono PS22 / professional ASIO drivers
+# are otherwise absent from the Windows Standalone "Options" device list.
+# Keep switch explicit so third-party ASIO SDK licensing can be audited.
+option(ARSON_WINDOWS_ASIO "Enable native ASIO devices for Windows Standalone" ON)
 add_library(arson_engine STATIC engine/Compressor.cpp)
 set_target_properties(arson_engine PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(arson_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/engine)
@@ -61,6 +65,13 @@ if(ARSON_BUILD_PLUGIN)
   endif()
   target_compile_definitions(ArSonComp PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0)
+  if(WIN32 AND ARSON_WINDOWS_ASIO)
+    # PUBLIC propagates to the generated Standalone wrapper and plugin smoke.
+    # Uses JUCE's bundled Steinberg ASIO headers (JUCE_ASIO_USE_EXTERNAL_SDK=0).
+    # VST3 still uses the host-selected driver; this affects Standalone only.
+    target_compile_definitions(ArSonComp PUBLIC JUCE_ASIO=1
+      JUCE_ASIO_USE_EXTERNAL_SDK=0)
+  endif()
   target_link_libraries(ArSonComp PRIVATE arson_engine ArSonCompKnobAssets juce::juce_audio_utils
     PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags)
   if(BUILD_TESTING)
