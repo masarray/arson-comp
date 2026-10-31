@@ -682,8 +682,12 @@ static int runSmoke(int argc,char** argv) {
             // Some JUCE ComboBox/host combinations deliver the change after
             // the popup selection message has finished. Allow that dispatch
             // before testing visibility, rather than requiring re-entrant GUI.
-            if(!browser->isVisible())
-                juce::MessageManager::getInstance()->runDispatchLoopUntil(75);
+            if(!browser->isVisible()) {
+                juce::Timer::callAfterDelay(75,[]{
+                    juce::MessageManager::getInstance()->stopDispatchLoop();
+                });
+                juce::MessageManager::getInstance()->runDispatchLoop();
+            }
             if(!browser->isVisible()||browser->getWidth()<500 ||
                browser->getHeight()<220) {
                 std::cerr<<"PRESET_BROWSER_80 visible="<<browser->isVisible()
