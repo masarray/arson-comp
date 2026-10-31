@@ -39,6 +39,15 @@ CompLook::CompLook() {
         BinaryData::black_brushed_knob_jpg,
         static_cast<std::size_t>(BinaryData::black_brushed_knob_jpgSize));
     jassert(sourceFace.isValid());
+    // Decode state sprites once on the GUI thread, never from processBlock().
+    toggleOn=juce::ImageFileFormat::loadFrom(
+        BinaryData::arson_toggle_on_png,
+        static_cast<std::size_t>(BinaryData::arson_toggle_on_pngSize));
+    toggleOff=juce::ImageFileFormat::loadFrom(
+        BinaryData::arson_toggle_off_png,
+        static_cast<std::size_t>(BinaryData::arson_toggle_off_pngSize));
+    jassert(toggleOn.isValid() && toggleOff.isValid());
+    jassert(toggleOn.getBounds()==toggleOff.getBounds());
     // Two light-weight, transparent gunmetal assets are decoded once,
     // exclusively on the GUI thread; no file I/O or decoding in paint().
     sliderTrack=juce::ImageFileFormat::loadFrom(
@@ -203,35 +212,34 @@ void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
                                  bool highlighted,bool down) {
-    const bool header=button.getButtonText()=="Bypass";
-    const bool checked=button.getToggleState();
-    const bool enabled=header?!checked:checked;
-    const float trackW=header?33.0f:32.0f;
-    const float trackH=header?16.0f:15.0f;
-    // Caption LEFT of the switch in both normal and header layouts.
-    const float tx=static_cast<float>(button.getWidth())-trackW-6.0f;
-    const float ty=(static_cast<float>(button.getHeight())-trackH)*0.50f;
+    const bool bypassControl=button.getButtonText()=="Bypass";
+    // In the DSP, bypass=1 means processing OFF. All other controls use
+    // the natural mapping: parameter=1 means this feature is ON.
+    const bool active=bypassControl?!button.getToggleState():button.getToggleState();
+    constexpr float trackW=56.0f,trackH=23.0f;
+    const float tx=static_cast<float>(button.getWidth())-trackW-4.0f;
+    const float ty=(static_cast<float>(button.getHeight())-trackH)*0.5f;
     const auto track=juce::Rectangle<float>{tx,ty,trackW,trackH};
-    g.setColour(juce::Colours::black.withAlpha(0.29f));
-    g.fillRoundedRectangle(track.translated(0.0f,0.9f),trackH*0.5f);
-    g.setColour(enabled?juce::Colour{0xff592c37}:juce::Colour{0xff252b30});
-    g.fillRoundedRectangle(track,trackH*0.5f);
-    g.setColour(enabled?accent.withAlpha(0.72f):
-                juce::Colour{0xff636b70}.withAlpha(0.76f));
-    g.drawRoundedRectangle(track,trackH*0.5f,0.8f);
-    const float knobR=trackH*0.5f-2.25f;
-    const float cx=enabled?tx+trackW-trackH*0.5f:tx+trackH*0.5f;
-    const float cy=ty+trackH*0.5f;
-    g.setColour(enabled?juce::Colour{0xffff8c92}:juce::Colour{0xffb7bbbc});
-    g.fillEllipse(cx-knobR,cy-knobR,knobR*2.0f,knobR*2.0f);
-    const auto label=header?(enabled?"ACTIVE":"BYPASS"):button.getButtonText();
-    g.setColour(enabled?juce::Colour{0xfff0efed}:juce::Colour{0xffc5c8c8});
-    g.setFont(juce::FontOptions(header?10.0f:9.5f));
-    g.drawText(label,0,0,juce::jmax(0,static_cast<int>(tx)-7),
+    const auto& sprite=active?toggleOn:toggleOff;
+    if(sprite.isValid()) {
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImage(sprite,track);
+    } else {
+        // Keep all four toggles legible even if binary data is missing.
+        g.setColour(active?juce::Colour{0xff4aaf61}:juce::Colour{0xffa83439});
+        g.fillRoundedRectangle(track,trackH*0.5f);
+    }
+    // The sprite already says ON/OFF; the adjacent caption identifies
+    // the affected compressor function without repeating that state.
+    const juce::String caption=bypassControl
+        ? (active?"ACTIVE":"BYPASS") : button.getButtonText();
+    g.setColour(juce::Colour{0xffe3e6e5});
+    g.setFont(juce::FontOptions(9.4f));
+    g.drawText(caption,0,0,juce::jmax(0,static_cast<int>(tx)-5),
         button.getHeight(),juce::Justification::centredRight,false);
     if(highlighted||down) {
-        g.setColour(accent.withAlpha(down?0.32f:0.13f));
-        g.drawRoundedRectangle(track.expanded(1.6f),trackH*0.5f,0.7f);
+        g.setColour(juce::Colours::white.withAlpha(down?0.28f:0.10f));
+        g.drawRoundedRectangle(track.reduced(1.0f),trackH*0.5f,0.7f);
     }
 }
 Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.snapshot()) {
