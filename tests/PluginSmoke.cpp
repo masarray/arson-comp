@@ -4,6 +4,7 @@
 #include "BinaryData.h"
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <iostream>
+#include <initializer_list>
 int main(int argc,char** argv) {
     juce::ScopedJuceInitialiser_GUI gui;
     // Quantitative edge-dissolve contract: endpoints transparent, the
@@ -259,9 +260,13 @@ int main(int argc,char** argv) {
            range->getBounds().intersects(mix->getBounds()) ||
            dynTab->getBounds().intersects(scTab->getBounds()) ||
            autoMode->getBounds().intersects(mix->getBounds()))return 28;
-        for(const auto* widget : {threshold,input,ratio,attack,hp,lp,detector,
-                                  autoMode,external,listen,style,presets,save,load,
-                                  file,compare,bypass,dynTab,scTab,range,mix}) {
+        // Explicit const base pointer type: MSVC cannot deduce one
+        // initializer_list type from mixed const/non-const Component*.
+        for(const juce::Component* widget :
+            std::initializer_list<const juce::Component*>{
+                threshold,input,ratio,attack,hp,lp,detector,autoMode,
+                external,listen,style,presets,save,load,file,compare,
+                bypass,dynTab,scTab,range,mix}) {
             if(!widget->isVisible())continue;
             if(widget->getX()<0 || widget->getRight()>editor->getWidth() ||
                widget->getY()<0 || widget->getBottom()>editor->getHeight())return 23;
