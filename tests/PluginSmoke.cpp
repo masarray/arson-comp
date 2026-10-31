@@ -236,6 +236,55 @@ int main(int argc,char** argv) {
             return 55;
         }
     }
+    // Production ON/OFF resources and Bypass inversion contract.
+    {
+        const auto on=juce::ImageFileFormat::loadFrom(
+            BinaryData::arson_toggle_on_png,
+            static_cast<std::size_t>(BinaryData::arson_toggle_on_pngSize));
+        const auto off=juce::ImageFileFormat::loadFrom(
+            BinaryData::arson_toggle_off_png,
+            static_cast<std::size_t>(BinaryData::arson_toggle_off_pngSize));
+        if(!on.isValid()||!off.isValid()||
+           on.getWidth()!=150||on.getHeight()!=62||
+           on.getBounds()!=off.getBounds()||
+           on.getPixelAt(0,0).getFloatAlpha()>0.02f||
+           off.getPixelAt(0,0).getFloatAlpha()>0.02f||
+           on.getPixelAt(75,31).getFloatAlpha()<0.85f||
+           off.getPixelAt(75,31).getFloatAlpha()<0.85f)return 56;
+        CompLook look;
+        juce::ToggleButton toggle;
+        toggle.setSize(126,30);
+        const auto render=[&](const char* caption,bool state) {
+            toggle.setButtonText(caption);
+            toggle.setToggleState(state,juce::dontSendNotification);
+            juce::Image canvas(juce::Image::RGB,126,30,true);
+            {
+                juce::Graphics g(canvas);
+                g.fillAll(juce::Colours::black);
+                look.drawToggleButton(g,toggle,false,false);
+            }
+            return canvas;
+        };
+        const auto countHue=[](const juce::Image& img,bool green) {
+            int total=0;
+            for(int y=4;y<26;++y)
+                for(int x=70;x<120;++x) {
+                    const auto p=img.getPixelAt(x,y);
+                    if(green?(p.getGreen()>p.getRed()+25 &&
+                              p.getGreen()>p.getBlue()+16):
+                             (p.getRed()>p.getGreen()+40 &&
+                              p.getRed()>p.getBlue()+25))
+                        ++total;
+                }
+            return total;
+        };
+        if(countHue(render("AUTO",true),true)<70||
+           countHue(render("AUTO",false),false)<70)return 57;
+        // Bypass checkbox is DSP inverted: checked=red OFF,
+        // unchecked=green ON. This must also survive the GUI theme.
+        if(countHue(render("Bypass",true),false)<70||
+           countHue(render("Bypass",false),true)<70)return 58;
+    }
     // Cached chassis must be genuinely brushed grey, while the LCD
     // must remain deep black. Probe actual JUCE image rasterization after
     // the Graphics lifetime ends (Windows may defer image writes).
