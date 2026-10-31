@@ -3,6 +3,7 @@
 #include "GraphPaint.h"
 #include "SurfacePaint.h"
 #include "GraphHistory.h"
+#include "HeaderLayout.h"
 #include "BinaryData.h"
 #include <cmath>
 #include <algorithm>
@@ -70,6 +71,7 @@ CompLook::CompLook() {
     setColour(juce::ComboBox::backgroundColourId,juce::Colour{0xff181d22});
     setColour(juce::ComboBox::textColourId,text);
     setColour(juce::ComboBox::outlineColourId,juce::Colour{0xff374047});
+    setColour(juce::ComboBox::arrowColourId,juce::Colour{0xffb0b8bb});
     setColour(juce::PopupMenu::backgroundColourId,juce::Colour{0xff161b20});
     setColour(juce::PopupMenu::textColourId,text);
     setColour(juce::PopupMenu::highlightedBackgroundColourId,juce::Colour{0xff602b32});
@@ -78,6 +80,54 @@ CompLook::CompLook() {
     setColour(juce::ToggleButton::textColourId,text);
     setColour(juce::ToggleButton::tickColourId,accent);
     setColour(juce::Label::textColourId,muted);
+}
+// Satin-finished combo surfaces: recessed but legible on a brushed chassis.
+void CompLook::drawComboBox(juce::Graphics& g,int width,int height,bool down,
+                            int buttonX,int buttonY,int buttonW,int buttonH,
+                            juce::ComboBox& box) {
+    juce::ignoreUnused(buttonX,buttonY,buttonW,buttonH);
+    auto r=box.getLocalBounds().toFloat().reduced(0.5f);
+    const bool hovered=box.isMouseOverOrDragging();
+    g.setGradientFill(juce::ColourGradient(
+        juce::Colour{0xff262e32},0.0f,0.0f,
+        juce::Colour{0xff151a1e},0.0f,static_cast<float>(height),false));
+    g.fillRoundedRectangle(r,4.5f);
+    g.setColour(down?juce::Colour{0xffa95b60}:
+        hovered?juce::Colour{0xff78858a}:juce::Colour{0xff3c474c});
+    g.drawRoundedRectangle(r,4.5f,1.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.06f));
+    g.drawHorizontalLine(2,5.0f,static_cast<float>(width-5));
+    // One discreet chevron; long preset titles receive the remaining width.
+    juce::Path caret;
+    const float cx=static_cast<float>(width)-15.0f;
+    const float cy=static_cast<float>(height)*0.50f;
+    caret.startNewSubPath(cx-3.5f,cy-1.5f);
+    caret.lineTo(cx,cy+2.0f);
+    caret.lineTo(cx+3.5f,cy-1.5f);
+    g.setColour(hovered?juce::Colour{0xffe0e5e5}:juce::Colour{0xffa2afb1});
+    g.strokePath(caret,juce::PathStrokeType(1.5f));
+}
+void CompLook::positionComboBoxText(juce::ComboBox& box,juce::Label& label) {
+    label.setBounds(11,1,juce::jmax(0,box.getWidth()-36),box.getHeight()-2);
+    label.setFont(juce::FontOptions(11.5f));
+    label.setJustificationType(juce::Justification::centredLeft);
+}
+void CompLook::drawButtonBackground(juce::Graphics& g,juce::Button& button,
+                                   const juce::Colour& background,
+                                   bool hovered,bool down) {
+    const auto id=button.getComponentID();
+    if(id!="view.compact" && id!="view.compare" && id!="view.file") {
+        juce::LookAndFeel_V4::drawButtonBackground(g,button,background,hovered,down);
+        return;
+    }
+    auto r=button.getLocalBounds().toFloat().reduced(0.5f);
+    g.setGradientFill(juce::ColourGradient(
+        down?juce::Colour{0xff30373b}:juce::Colour{0xff293035},0.0f,0.0f,
+        juce::Colour{0xff151b1e},0.0f,r.getHeight(),false));
+    g.fillRoundedRectangle(r,4.5f);
+    g.setColour(down?juce::Colour{0xffa95b60}:
+        hovered?juce::Colour{0xff7b8588}:juce::Colour{0xff485156});
+    g.drawRoundedRectangle(r,4.5f,1.0f);
 }
 juce::Label* CompLook::createSliderTextBox(juce::Slider& s) {
     auto* label=juce::LookAndFeel_V4::createSliderTextBox(s);
@@ -496,14 +546,15 @@ void Editor::syncPanelVisibility() {
 }
 void Editor::resized() {
     const int w=getWidth(),h=getHeight();
-    // The utility menu replaces two permanent buttons. Presets and model
-    // have measurable reserved space at both 860 and 900 pixel layouts.
-    compact.setBounds(147,21,45,28);
-    style.setBounds(198,20,125,30);
-    presets.setBounds(333,20,w-580,30);
-    compare.setBounds(w-237,20,49,30);
-    fileMenu.setBounds(w-180,20,57,30);
-    bypass.setBounds(w-115,21,105,28);
+    // A shared compact header grid: every control has the same baseline.
+    // Preset is constrained to 144..176px rather than consuming all free space.
+    const auto header=arson::ui::HeaderLayout::calculate(w);
+    compact.setBounds(header.mini);
+    style.setBounds(header.model);
+    presets.setBounds(header.preset);
+    compare.setBounds(header.compare);
+    fileMenu.setBounds(header.file);
+    bypass.setBounds(header.bypass);
     // Compact responsive hardware chassis; LCD still has its own display.
     display=compactMode?juce::Rectangle<int>{}:
         juce::Rectangle<int>{8,70,w-16,h-268};
@@ -732,22 +783,33 @@ void Editor::paint(juce::Graphics& g) {
     g.drawHorizontalLine(1,0.0f,static_cast<float>(getWidth()));
     g.setColour(juce::Colours::black.withAlpha(0.58f));
     g.drawHorizontalLine(67,0.0f,static_cast<float>(getWidth()));
-    // Compact single-line embossed ArSonComp wordmark. Crop is preprocessed into
-    // 360x72 pixels, with no subtitle or glow. The 131px viewport stops before
-    // MINI starts at x=147; retain aspect ratio for legibility on small displays.
+    // Single-line embossed brand and a quiet, consistent overline hierarchy.
+    const auto header=arson::ui::HeaderLayout::calculate(getWidth());
     if(headerLogo.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImageWithin(headerLogo,13,17,131,31,juce::RectanglePlacement::centred);
+        g.drawImageWithin(headerLogo,header.logo.getX(),header.logo.getY(),
+            header.logo.getWidth(),header.logo.getHeight(),
+            juce::RectanglePlacement::centred);
     } else {
-        // Graceful fallback for missing/corrupt embedded resources.
         g.setColour(text);
         g.setFont(juce::FontOptions(17.0f));
-        g.drawText("ArSonComp",16,11,128,30,juce::Justification::centredLeft);
+        g.drawText("ArSonComp",header.logo,juce::Justification::centredLeft);
     }
-    g.setColour(text.withAlpha(0.73f));
-    g.setFont(juce::FontOptions(9.0f));
-    g.drawText("MODEL",198,5,84,13,juce::Justification::left);
-    g.drawText("PRESET",333,5,88,13,juce::Justification::left);
+    // Subtle division between branding and functional toolbar; no visual noise.
+    g.setColour(juce::Colours::white.withAlpha(0.10f));
+    g.drawVerticalLine(header.logo.getRight()+5,18.0f,52.0f);
+    g.setColour(muted.withAlpha(0.85f));
+    g.setFont(juce::FontOptions(8.7f));
+    const auto caption=[&g](const char* title,const juce::Rectangle<int>& r) {
+        g.drawText(title,r.getX()+1,9,r.getWidth()-2,12,
+            juce::Justification::centredLeft,false);
+    };
+    caption("VIEW",header.mini);
+    caption("MODEL",header.model);
+    caption("PRESET",header.preset);
+    caption("COMPARE",header.compare);
+    caption("FILES",header.file);
+    caption("ENGINE",header.bypass);
 
     const int mainY=compactMode?68:display.getBottom()+5;
     const int bottomY=compactMode?166:getHeight()-92;

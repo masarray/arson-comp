@@ -5,6 +5,10 @@
 class CompLook final : public juce::LookAndFeel_V4 {
 public:
     CompLook();
+    void drawComboBox(juce::Graphics&,int,int,bool,int,int,int,int,juce::ComboBox&) override;
+    void positionComboBoxText(juce::ComboBox&,juce::Label&) override;
+    void drawButtonBackground(juce::Graphics&,juce::Button&,
+                              const juce::Colour&,bool,bool) override;
     juce::Label* createSliderTextBox(juce::Slider&) override;
     void drawRotarySlider(juce::Graphics&,int,int,int,int,float,float,float,juce::Slider&) override;
     void drawLinearSlider(juce::Graphics&,int,int,int,int,float,float,float,

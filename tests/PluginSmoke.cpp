@@ -1,5 +1,6 @@
 #include "../plugin/Processor.h"
 #include "../plugin/Editor.h"
+#include "../plugin/HeaderLayout.h"
 #include "../plugin/PresetIO.h"
 #include "../plugin/GraphPaint.h"
 #include "../plugin/SurfacePaint.h"
@@ -377,6 +378,21 @@ int main(int argc,char** argv) {
     file.deleteFile();
     juce::AudioBuffer<float> buffer(2,128);juce::MidiBuffer midi;
     for(int j=0;j<1000;++j) {buffer.clear();buffer.setSample(0,0,0.5f);processor.processBlock(buffer,midi);}
+    // Full toolbar geometry across minimum/default/wide editor widths:
+    // consistent 10px gaps, uniform baseline and bounded preset dropdown.
+    for(const int width : {740,780,900,1200}) {
+        const auto h=arson::ui::HeaderLayout::calculate(width);
+        const std::array<juce::Rectangle<int>,7> fields{
+            h.logo,h.mini,h.model,h.preset,h.compare,h.file,h.bypass};
+        if(h.preset.getWidth()<144||h.preset.getWidth()>176||
+           h.bypass.getRight()!=width-14||h.logo.getX()!=14)return 62;
+        for(std::size_t i=1;i<fields.size();++i) {
+            if(fields[i].getX()-fields[i-1].getRight()<10 ||
+               fields[i].getRight()>width-14 ||
+               fields[i].getWidth()<=0)return 63;
+            if(fields[i].getY()!=24||fields[i].getHeight()!=28)return 64;
+        }
+    }
     for(int iteration=0;iteration<8;++iteration) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
@@ -439,6 +455,16 @@ int main(int argc,char** argv) {
         if(!hp||!lp||!detector||!autoMode||!external||!listen||
            !style||!presets||!save||!load||!file||!compare||!bypass||
            !dynTab||!scTab||!range||!mix)return 21;
+        // Actual JUCE component positions must match the shared header grid;
+        // this catches collisions and regressions in MINI/FULL resizing.
+        const auto header=arson::ui::HeaderLayout::calculate(editor->getWidth());
+        const auto* mini=editor->findChildWithID("view.compact");
+        if(!mini || mini->getBounds()!=header.mini ||
+           style->getBounds()!=header.model ||
+           presets->getBounds()!=header.preset ||
+           compare->getBounds()!=header.compare ||
+           file->getBounds()!=header.file ||
+           bypass->getBounds()!=header.bypass)return 65;
         // File controls are deliberately not mounted in the visible header.
         // Both independent tab views must have unclipped, non-overlapping
         // active controls at 740 and 780px.
