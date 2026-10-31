@@ -1,6 +1,7 @@
 #pragma once
 #include "Parameters.h"
 #include "MeterQueue.h"
+#include <cstdint>
 namespace arson {
 // Framework-free, audio-thread-owned state. Planar mono/stereo, arbitrary block size.
 class Compressor {
@@ -23,6 +24,15 @@ private:
     };
     Parameters p;
     std::array<Ramp,Count> smooth{};
+    // Canonical smoothed values and sparse ramp indexes. Audio calls never
+    // allocate; stable controls cause zero per-sample ramp work.
+    std::array<float,Count> currentValues{};
+    std::array<std::uint8_t,Count> activeRampIndices{};
+    std::size_t activeRampCount=0;
+    // Preconverted lower knee edge for the steady-parameter no-compression path.
+    // Disabled while threshold/knee are ramping to retain exact automation.
+    float lowerKneeLinear=0.0f;
+    bool staticKneeGate=false;
     // Filter on/off is blended separately from cutoff coefficients to avoid endpoint steps.
     std::array<Ramp,2> filterWet{};
     std::array<float,2> hpState{}, lpState{}, rms{}, envelope{}, smoothEnvelope{}, previousGain{1.0f,1.0f};

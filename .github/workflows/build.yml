@@ -32,6 +32,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force artifacts
           & ./build/Release/engine_bench.exe | Tee-Object artifacts/benchmark.txt
+          & ./build/Release/rt_stress.exe | Tee-Object artifacts/realtime-stress.txt
       - name: Package install-ready Windows test artifact
         shell: pwsh
         run: |
@@ -42,6 +43,7 @@ jobs:
           Copy-Item 'build/ArSonComp_artefacts/Release/Standalone/ArSonComp.exe' "$dest/Standalone/"
           Copy-Item 'docs/WINDOWS-QUICKSTART.md' "$dest/START-HERE.md"
           Copy-Item 'artifacts/benchmark.txt' "$dest/benchmark.txt"
+          Copy-Item 'artifacts/realtime-stress.txt' "$dest/realtime-stress.txt"
           Copy-Item 'build/ArSonComp-preview*.png' "$dest/Screenshots/"
           $files = Get-ChildItem "$dest/Plugin", "$dest/Standalone" -File -Recurse
           $files | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)  $($_.FullName.Substring((Resolve-Path $dest).Path.Length + 1))" } |

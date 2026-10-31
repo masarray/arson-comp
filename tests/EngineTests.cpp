@@ -198,6 +198,75 @@ int main() {
         MeterFrame f;int count=0;while(q.pop(f))++count;require(count==511,"bounded telemetry drops on saturation");
     }
     {
+        // Quiet input must be bit-exact passthrough when the entire
+        // detector remains below the knee. Regression for the optional
+        // static linear-domain gate across model/detector/sample rates.
+        for(double rate: {44100.0,48000.0,96000.0,192000.0})
+            for(int model=0;model<3;++model)
+                for(int detector=0;detector<2;++detector) {
+                    Parameters p;
+                    p.value[Style]=static_cast<float>(model);
+                    p.value[Detector]=static_cast<float>(detector);
+                    p.value[Threshold]=-30.0f;
+                    p.value[Knee]=18.0f;
+                    p.value[Highpass]=100.0f;
+                    Compressor c;c.prepare(rate,p);
+                    std::array<float,512> left{},right{};
+                    for(int i=0;i<512;++i) {
+                        left[i]=0.004f*std::sin(i*0.13f);
+                        right[i]=0.003f*std::cos(i*0.19f);
+                    }
+                    const auto referenceLeft=left,referenceRight=right;
+                    float* ptr[]{left.data(),right.data()};
+                    c.process(ptr,2,512);
+                    require(left==referenceLeft && right==referenceRight,
+                            "steady below-knee audio remains bit exact");
+                }
+        // A threshold/knee automation ramp must not erroneously gate
+        // gain reduction before its sample-smoothed target is reached.
+        Parameters p;p.value[Threshold]=-8;p.value[Knee]=0;
+        Compressor smooth,reference;
+        smooth.prepare(48000,p);reference.prepare(48000,p);
+        p.value[Threshold]=-40;p.value[Knee]=18;
+        smooth.setParameters(p);reference.setParameters(p);
+        std::array<float,4096> a{},b{};
+        for(int i=0;i<4096;++i) a[i]=b[i]=0.045f;
+        float* pa[]{a.data()},*pb[]{b.data()};
+        smooth.process(pa,1,4096);
+        for(int off=0;off<4096;) {
+            const int len=std::min(29,4096-off);
+            float* sub[]{b.data()+off};
+            reference.setParameters(p);reference.process(sub,1,len);
+            off+=len;
+        }
+        require(a==b,"sparse ramps and gate remain block-partition invariant");
+        require(a.back()<0.045f,"threshold automation eventually reduces gain");
+        // Multi-instance memory and signal safety: no heap allocations
+        // during repeated short-block processing and automation snapshots.
+        std::array<Compressor,8> engines{};
+        std::array<Parameters,8> ps{};
+        for(auto& e:engines)e.prepare(48000);
+        float l[128]{},r[128]{};float* audio[]{l,r};
+        const auto before=allocations.load();
+        for(int frames: {32,64,128})for(int block=0;block<240;++block) {
+            for(int i=0;i<frames;++i) {
+                l[i]=0.2f*std::sin(i*0.07f);r[i]=0.17f*std::cos(i*0.13f);
+            }
+            for(std::size_t x=0;x<engines.size();++x) {
+                auto& spec=ps[x];
+                spec.value[Threshold]=-30.0f+static_cast<float>((block+x)%12);
+                spec.value[Detector]=static_cast<float>(block%2);
+                spec.value[Style]=static_cast<float>(x%3);
+                engines[x].setParameters(spec);
+                engines[x].process(audio,2,frames);
+                require(std::isfinite(l[frames-1]) && std::isfinite(r[frames-1]),
+                        "multi-instance finite output");
+            }
+        }
+        require(allocations.load()==before,
+                "multi-instance 32/64/128 processing allocates no heap");
+    }
+    {
         // Two LED meter columns must carry genuinely independent channel
         // peak values, rather than duplicating one shared maximum.
         Compressor c;Parameters p;p.value[Ratio]=1.0f;c.prepare(48000,p);
