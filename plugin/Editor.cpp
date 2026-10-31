@@ -234,23 +234,6 @@ void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
         g.drawRoundedRectangle(track.expanded(1.6f),trackH*0.5f,0.7f);
     }
 }
-juce::Font CompLook::getSliderPopupFont(juce::Slider&) { return juce::Font(juce::FontOptions(12.5f)); }
-void CompLook::drawTooltip(juce::Graphics& g,const juce::String& value,int w,int h) {
-    const auto r=juce::Rectangle<float>(1.0f,1.0f,static_cast<float>(w-2),static_cast<float>(h-2));
-    g.setColour(juce::Colours::black.withAlpha(0.22f));
-    g.fillRoundedRectangle(r.translated(0.0f,1.0f),6.0f);
-    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff283037},0,0,
-         juce::Colour{0xff15191d},static_cast<float>(w),static_cast<float>(h),false));
-    g.fillRoundedRectangle(r,6.0f);
-    g.setColour(juce::Colour{0xff5b6267});
-    g.drawRoundedRectangle(r,6.0f,0.8f);
-    g.setColour(accent.withAlpha(0.78f));
-    g.fillRoundedRectangle(7.0f,8.0f,2.0f,static_cast<float>(std::max(4,h-16)),1.0f);
-    g.setColour(text);
-    g.setFont(juce::FontOptions(12.0f));
-    g.drawFittedText(value,15,5,w-24,h-10,juce::Justification::centredLeft,3);
-}
-
 Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.snapshot()) {
     setLookAndFeel(&look);
     setOpaque(true);
@@ -262,34 +245,24 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         k.setLookAndFeel(&look);
         k.setSliderStyle(std::find(bars.begin(),bars.end(),i)!=bars.end()
             ? juce::Slider::LinearHorizontal : juce::Slider::RotaryHorizontalVerticalDrag);
-        // Numeric values live in on-hover/on-drag value popups; no row of
-        // boxed numbers cluttering the control surface.
+        // A single bottom-of-LCD value readout replaces all popup overlays.
         k.setTextBoxStyle(juce::Slider::NoTextBox,false,0,0);
-        k.setPopupDisplayEnabled(true,false,this);
+        k.setPopupDisplayEnabled(false,false,nullptr);
+        k.addMouseListener(this,false);
         k.setTextValueSuffix(spec.unit);
         k.setNumDecimalPlacesToDisplay(i==arson::Attack || i==arson::Ratio ? 2 : 1);
         k.setDoubleClickReturnValue(true,spec.initial);
         k.setScrollWheelEnabled(false);
         k.setName(spec.name);
         k.setComponentID("param."+juce::String(spec.id));
-        const auto describe=[this,i] {
-            const auto& s=arson::specs[i];
-            auto& slider=knobs[i];
-            const int decimals=(i==arson::Ratio || i==arson::Attack)?2:1;
-            const juce::String value=(i==arson::Highpass || i==arson::Lowpass)
-                ? juce::String(juce::roundToInt(slider.getValue()))
-                : juce::String(slider.getValue(),decimals);
-            slider.setTooltip(juce::String(s.name)+": "+value+juce::String(s.unit)+
-                "  |  Drag to adjust · double-click to reset");
+        k.onValueChange=[this,i] {
+            if(hoveredParameter==i)updateHoverReadout(i);
         };
-        k.onValueChange=describe;
-        describe();
         juce::String shortLabel=juce::String(spec.name).toUpperCase();
         if(i==arson::Highpass) shortLabel="HP";
         if(i==arson::Lowpass) shortLabel="LP";
         if(i==arson::Link) shortLabel="LINK";
         labels[i].setText(shortLabel,juce::dontSendNotification);
-        labels[i].setTooltip(juce::String(spec.name)+": adjust the compressor's "+spec.name);
         labels[i].setFont(juce::FontOptions(11.0f));
         labels[i].setJustificationType(juce::Justification::centred);
         addAndMakeVisible(labels[i]);
@@ -298,19 +271,16 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     }
     style.addItemList({"Clean","Feedback","Smooth"},1);
     style.setComponentID("view.model");
-    style.setTooltip("Three independent zero-added-sample-latency compressor models.");
     addAndMakeVisible(style);
     styleAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         p.state,"style",style);
     presets.addItemList({"Default","Vocal | gentle","Vocal | level",
         "Mix bus | glue","Drums | punch","Podcast | steady"},1);
     presets.setComponentID("view.presets");
-    presets.setTooltip("Choose a factory starting point; threshold depends on input level.");
     presets.onChange=[this] {applyPreset(presets.getSelectedId());};
     addAndMakeVisible(presets);
     detector.addItemList({"Peak","RMS"},1);
     detector.setComponentID("view.detector");
-    detector.setTooltip("Peak: transients; RMS: smoothed 10 ms energy, with zero lookahead.");
     addAndMakeVisible(detector);
     detectorAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         p.state,"detector",detector);
@@ -326,12 +296,8 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     autoRelease.setButtonText("AUTO");
     external.setButtonText("EXT SC");
     listen.setButtonText("LISTEN");
-    autoRelease.setTooltip("Auto Release - adapts recovery time to signal activity.");
-    external.setTooltip("External Sidechain - routes the host's auxiliary detector bus.");
-    listen.setTooltip("Listen Sidechain - audition the filtered detector signal.");
     compare.setComponentID("view.compare");
     bypass.setComponentID("view.bypass");
-    compare.setTooltip("A/B snapshots apply to actual host parameters.");
     compare.onClick=[this] {
         const auto current=processor.snapshot();
         for(std::size_t i=0;i<arson::Count;++i) setValue(i,alternate[i]);
@@ -343,8 +309,6 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     addAndMakeVisible(compare);
     savePreset.setComponentID("preset.save");
     loadPreset.setComponentID("preset.load");
-    savePreset.setTooltip("Export all current parameters to a .arsoncomp user preset.");
-    loadPreset.setTooltip("Open a validated versioned .arsoncomp user preset.");
     savePreset.onClick=[this] {
         presetChooser=std::make_unique<juce::FileChooser>(
             "Save ArSonComp preset",
@@ -398,7 +362,6 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     addChildComponent(savePreset);
     addChildComponent(loadPreset);
     fileMenu.setComponentID("view.file");
-    fileMenu.setTooltip("User presets: save current settings or open a .arsoncomp preset.");
     fileMenu.onClick=[this] {
         juce::PopupMenu menu;
         menu.addItem(1,"Save preset...");
@@ -415,35 +378,39 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     addAndMakeVisible(fileMenu);
     dynamicsTab.setComponentID("view.dynamics.tab");
     sidechainTab.setComponentID("view.sidechain.tab");
-    dynamicsTab.setTooltip("Range, Hold, Mix, Link and Auto Release.");
-    sidechainTab.setTooltip("Sidechain detector mode, HP/LP filters, external routing and audition.");
     dynamicsTab.onClick=[this]{sidechainPanel=false;syncPanelVisibility();};
     sidechainTab.onClick=[this]{sidechainPanel=true;syncPanelVisibility();};
     addAndMakeVisible(dynamicsTab);
     addAndMakeVisible(sidechainTab);
     compact.setComponentID("view.compact");
-    compact.setTooltip("MINI shows hardware controls and horizontal stereo meters.");
     compact.onClick=[this] {
         compactMode=!compactMode;
         if(compactMode) {
             expandedWidth=getWidth();expandedHeight=getHeight();
-            setResizeLimits(860,380,1200,380);
+            setResizeLimits(740,330,1200,330);
             compact.setButtonText("FULL");
-            setSize(expandedWidth,380);
+            setSize(expandedWidth,330);
         } else {
-            setResizeLimits(860,700,1200,965);
+            setResizeLimits(740,585,1200,965);
             compact.setButtonText("MINI");
             setSize(expandedWidth,expandedHeight);
         }
     };
     addAndMakeVisible(compact);
+    hoverReadout.setComponentID("view.value.readout");
+    hoverReadout.setFont(juce::FontOptions(11.0f));
+    hoverReadout.setColour(juce::Label::textColourId,accentBright);
+    hoverReadout.setJustificationType(juce::Justification::centred);
+    hoverReadout.setInterceptsMouseClicks(false,false);
+    addAndMakeVisible(hoverReadout);
+    updateHoverReadout(hoveredParameter);
     arson::MeterFrame discard;
     for(std::uint32_t i=0;i<arson::MeterQueue::capacity && p.meters.pop(discard);++i){}
     presets.setSelectedId(0,juce::dontSendNotification);
     presets.setText("Custom / restored",juce::dontSendNotification);
     setResizable(true,true);
     setResizeLimits(860,700,1200,965);
-    setSize(900,765);
+    setSize(780,640);
     syncPanelVisibility();
     startTimerHz(30);
 }
@@ -517,27 +484,26 @@ void Editor::resized() {
     const int w=getWidth(),h=getHeight();
     // The utility menu replaces two permanent buttons. Presets and model
     // have measurable reserved space at both 860 and 900 pixel layouts.
-    compact.setBounds(166,21,45,28);
-    style.setBounds(218,20,145,30);
-    presets.setBounds(375,20,w-640,30);
-    compare.setBounds(w-257,20,49,30);
-    fileMenu.setBounds(w-200,20,57,30);
-    bypass.setBounds(w-135,21,120,28);
-    // Compact 82px knob row reserves more space for the functional LCD.
-    // Full default 900x765 and min 860x700 remain responsive.
+    compact.setBounds(147,21,45,28);
+    style.setBounds(198,20,125,30);
+    presets.setBounds(333,20,w-580,30);
+    compare.setBounds(w-237,20,49,30);
+    fileMenu.setBounds(w-180,20,57,30);
+    bypass.setBounds(w-115,21,105,28);
+    // Compact responsive hardware chassis; LCD still has its own display.
     display=compactMode?juce::Rectangle<int>{}:
-        juce::Rectangle<int>{8,73,w-16,h-298};
-    const int mainY=compactMode?68:display.getBottom()+8;
+        juce::Rectangle<int>{8,70,w-16,h-268};
+    const int mainY=compactMode?68:display.getBottom()+5;
     const int cell=(w-28)/7;
     constexpr std::array<std::size_t,7> main{arson::Input,arson::Attack,
         arson::Release,arson::Threshold,arson::Ratio,arson::Knee,arson::Makeup};
     for(std::size_t k=0;k<main.size();++k) {
         const auto i=main[k];const int x=14+static_cast<int>(k)*cell;
         labels[i].setBounds(x,mainY+3,cell,17);
-        knobs[i].setBounds(x+3,mainY+20,cell-6,82);
+        knobs[i].setBounds(x+3,mainY+20,cell-6,70);
     }
 
-    const int bottomY=compactMode?177:h-106;
+    const int bottomY=compactMode?166:h-92;
     dynamicsTab.setBounds(16,bottomY+1,92,23);
     sidechainTab.setBounds(114,bottomY+1,94,23);
     // Main tab: four comfortable controls, plus a dedicated AUTO control.
@@ -547,20 +513,32 @@ void Editor::resized() {
     for(std::size_t k=0;k<dynamics.size();++k) {
         const auto i=dynamics[k];const int x=16+static_cast<int>(k)*slot;
         labels[i].setBounds(x,bottomY+25,slot-10,15);
-        knobs[i].setBounds(x+5,bottomY+41,slot-18,40);
+        knobs[i].setBounds(x+5,bottomY+38,slot-18,40);
     }
-    autoRelease.setBounds(w-153,bottomY+45,139,28);
+    autoRelease.setBounds(w-153,bottomY+42,139,28);
 
     // Sidechain tab: only detector-specific controls are painted.
     constexpr std::array<std::size_t,2> filters{arson::Highpass,arson::Lowpass};
+    // Responsive five-column sidechain panel, no fixed overflow positions.
+    const int available=w-32;
+    const int filterSlot=juce::jlimit(136,174,available*23/100);
+    const int detW=juce::jlimit(92,108,available*14/100);
+    const int extW=juce::jlimit(108,118,available*17/100);
+    const int listenW=juce::jlimit(105,118,available*16/100);
+    const int filterStart=16;
     for(std::size_t k=0;k<filters.size();++k) {
-        const auto i=filters[k];const int x=17+static_cast<int>(k)*194;
-        labels[i].setBounds(x,bottomY+25,181,15);
-        knobs[i].setBounds(x+5,bottomY+41,170,40);
+        const auto i=filters[k];const int x=filterStart+static_cast<int>(k)*filterSlot;
+        labels[i].setBounds(x,bottomY+25,filterSlot-8,15);
+        knobs[i].setBounds(x+2,bottomY+38,filterSlot-8,40);
     }
-    detector.setBounds(423,bottomY+46,104,27);
-    external.setBounds(550,bottomY+44,112,30);
-    listen.setBounds(684,bottomY+44,105,30);
+    const int detX=filterStart+filterSlot*2+8;
+    detector.setBounds(detX,bottomY+43,detW,27);
+    external.setBounds(detX+detW+8,bottomY+42,extW,30);
+    listen.setBounds(detX+detW+extW+16,bottomY+42,listenW,30);
+    const int readoutW=juce::jmin(254,w-40);
+    hoverReadout.setBounds(compactMode?w-readoutW-14:
+        display.getCentreX()-readoutW/2,
+        compactMode?h-21:display.getBottom()-27,readoutW,18);
     // Old file buttons are intentionally non-visible.
     savePreset.setBounds(0,0,0,0);
     loadPreset.setBounds(0,0,0,0);
@@ -572,7 +550,7 @@ void Editor::resized() {
         // MINI meter glass is a static bezel; paint only live bar data
         // above this cached surface during normal timer repaints.
         if(compactMode) arson::ui::paintInsetGlass(chassis,
-            {13.0f,301.0f,static_cast<float>(w-26),49.0f});
+            {13.0f,258.0f,static_cast<float>(w-26),47.0f});
     }
     if(compactMode){grid=juce::Image();return;}
 
@@ -740,19 +718,19 @@ void Editor::paint(juce::Graphics& g) {
     g.drawHorizontalLine(1,0.0f,static_cast<float>(getWidth()));
     g.setColour(juce::Colours::black.withAlpha(0.58f));
     g.drawHorizontalLine(67,0.0f,static_cast<float>(getWidth()));
-    g.setFont(juce::FontOptions(19.6f));
+    g.setFont(juce::FontOptions(17.5f));
     g.setColour(text);
-    g.drawText("ArSon",16,11,81,28,juce::Justification::centredLeft);
+    g.drawText("ArSon",16,11,73,28,juce::Justification::centredLeft);
     g.setColour(accent);
-    g.drawText("Comp",88,11,71,28,juce::Justification::centredLeft);
+    g.drawText("Comp",84,11,61,28,juce::Justification::centredLeft);
     g.fillRoundedRectangle(17.0f,49.0f,37.0f,2.0f,1.0f);
     g.setColour(text.withAlpha(0.73f));
     g.setFont(juce::FontOptions(9.0f));
-    g.drawText("MODEL",219,5,84,13,juce::Justification::left);
-    g.drawText("PRESET",376,5,88,13,juce::Justification::left);
+    g.drawText("MODEL",198,5,84,13,juce::Justification::left);
+    g.drawText("PRESET",333,5,88,13,juce::Justification::left);
 
-    const int mainY=compactMode?68:display.getBottom()+8;
-    const int bottomY=compactMode?177:getHeight()-106;
+    const int mainY=compactMode?68:display.getBottom()+5;
+    const int bottomY=compactMode?166:getHeight()-92;
     g.setColour(juce::Colours::black.withAlpha(0.105f));
     g.fillRect(8,mainY,getWidth()-16,bottomY-mainY);
     g.setColour(juce::Colours::black.withAlpha(0.40f));
@@ -766,7 +744,7 @@ void Editor::paint(juce::Graphics& g) {
         g.setColour(juce::Colours::black.withAlpha(0.15f));
         const float x=14.0f+static_cast<float>(i*cell);
         g.drawVerticalLine(static_cast<int>(x),static_cast<float>(mainY+17),
-                           static_cast<float>(mainY+100));
+                           static_cast<float>(mainY+90));
     }
     g.setColour(accent.withAlpha(0.68f));
     g.fillRoundedRectangle(sidechainPanel?115.0f:17.0f,
@@ -777,8 +755,8 @@ void Editor::paint(juce::Graphics& g) {
     } else paintCompactMeters(g);
     g.setColour(text.withAlpha(0.66f));
     g.setFont(juce::FontOptions(9.0f));
-    g.drawText("0 SAMPLES ADDED  /  REALTIME DSP",
-        14,getHeight()-18,290,14,juce::Justification::left);
+    g.drawText("0 SAMPLES ADDED / REALTIME DSP",
+        14,getHeight()-18,232,14,juce::Justification::left);
 }
 void Editor::refreshTransfer(const arson::Parameters& p,juce::Rectangle<float> plot) {
     const std::array<float,4> key{{p[arson::Threshold],p[arson::Ratio],
@@ -919,19 +897,46 @@ void Editor::paintCompactMeters(juce::Graphics& g) {
     for(int i=0;i<3;++i) {
         const float x=20.0f+static_cast<float>(i*segment);
         g.setColour(muted);g.setFont(juce::FontOptions(10.0f));
-        g.drawText(labelsText[i],static_cast<int>(x),304,109,16,juce::Justification::left);
+        g.drawText(labelsText[i],static_cast<int>(x),261,109,16,juce::Justification::left);
         g.setColour(text);g.setFont(juce::FontOptions(11.0f));
-        g.drawText(levelText(values[i])+" dB",static_cast<int>(x)+segment-85,304,78,16,
+        g.drawText(levelText(values[i])+" dB",static_cast<int>(x)+segment-85,261,78,16,
             juce::Justification::centredRight);
         g.setColour(line);
-        const float bw=static_cast<float>(segment-16), y=330.0f;
+        const float bw=static_cast<float>(segment-16), y=289.0f;
         g.fillRoundedRectangle(x,y,bw,6.0f,3.0f);
         const float filled=i==1?clamp01(values[i]/30.0f):dbFraction(values[i]);
         g.setColour(i==1?accent:green);
         if(filled>0.0f)g.fillRoundedRectangle(x,y,bw*filled,6.0f,3.0f);
     }
 }
+void Editor::updateHoverReadout(std::size_t index) {
+    if(index>=knobs.size())return;
+    const auto& spec=arson::specs[index];
+    const int digits=(index==arson::Attack || index==arson::Ratio)?2:
+        ((index==arson::Highpass || index==arson::Lowpass ||
+          index==arson::Mix || index==arson::Link || index==arson::Hold)?0:1);
+    const juce::String value=juce::String(spec.name).toUpperCase()+"    "+
+        juce::String(knobs[index].getValue(),digits)+juce::String(spec.unit);
+    if(hoverReadout.getText()!=value)
+        hoverReadout.setText(value,juce::dontSendNotification);
+}
+bool Editor::focusHoveredSlider(const juce::MouseEvent& event) {
+    for(std::size_t i=0;i<knobs.size();++i) {
+        if(event.eventComponent==&knobs[i]) {
+            if(hoveredParameter!=i) {
+                hoveredParameter=i;
+                updateHoverReadout(i);
+            }
+            return true;
+        }
+    }
+    return false;
+}
+void Editor::mouseEnter(const juce::MouseEvent& event) {
+    focusHoveredSlider(event);
+}
 void Editor::mouseDown(const juce::MouseEvent& event) {
+    if(focusHoveredSlider(event))return;
     if(compactMode || !plotBounds().contains(event.position))return;
     const auto p=processor.snapshot();
     const auto plot=plotBounds();
@@ -948,12 +953,15 @@ void Editor::mouseDown(const juce::MouseEvent& event) {
     }
 }
 void Editor::mouseDrag(const juce::MouseEvent& event) {
+    if(focusHoveredSlider(event))return;
     if(!thresholdDragging)return;
     const auto plot=plotBounds();
     const float threshold=-60.0f+60.0f*clamp01(
         (event.position.x-plot.getX())/plot.getWidth());
     if(auto* parameter=processor.state.getParameter("threshold"))
         parameter->setValueNotifyingHost(parameter->convertTo0to1(threshold));
+    hoveredParameter=arson::Threshold;
+    updateHoverReadout(hoveredParameter);
     repaint(display);
 }
 void Editor::mouseUp(const juce::MouseEvent&) {
@@ -964,6 +972,7 @@ void Editor::mouseUp(const juce::MouseEvent&) {
     setMouseCursor(juce::MouseCursor::NormalCursor);
 }
 void Editor::mouseMove(const juce::MouseEvent& event) {
+    if(focusHoveredSlider(event))return;
     if(compactMode || !plotBounds().contains(event.position)) {
         setMouseCursor(juce::MouseCursor::NormalCursor);
         return;

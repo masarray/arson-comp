@@ -297,9 +297,9 @@ int main(int argc,char** argv) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
-        editor->setSize(iteration%2 ? 860 : 900,iteration%2 ? 700 : 765);
-        if(editor->getWidth()!=(iteration%2 ? 860 : 900) ||
-           editor->getHeight()!=(iteration%2 ? 700 : 765))return 9;
+        editor->setSize(iteration%2 ? 740 : 780,iteration%2 ? 585 : 640);
+        if(editor->getWidth()!=(iteration%2 ? 740 : 780) ||
+           editor->getHeight()!=(iteration%2 ? 585 : 640))return 9;
         auto* threshold=editor->findChildWithID("param.threshold");
         auto* input=editor->findChildWithID("param.input");
         auto* ratio=editor->findChildWithID("param.ratio");
@@ -311,15 +311,23 @@ int main(int argc,char** argv) {
             auto* slider=dynamic_cast<juce::Slider*>(candidate);
             if(!slider || slider->getTextBoxPosition()!=juce::Slider::NoTextBox)
                 return 48;
-            // Value remains available by accessible popup/tooltips even
-            // though boxed numeric labels no longer crowd the control strip.
-            if(slider->getTooltip().isEmpty())return 49;
+            // No floating tooltip obscures the hardware control strip.
+            if(!slider->getTooltip().isEmpty())return 49;
         }
+        auto* readout=dynamic_cast<juce::Label*>(
+            editor->findChildWithID("view.value.readout"));
+        if(!readout || !readout->isVisible() ||
+           !readout->getText().containsIgnoreCase("THRESHOLD") ||
+           readout->getBounds().intersects(threshold->getBounds()))return 56;
+        auto* thresholdSlider=dynamic_cast<juce::Slider*>(threshold);
+        if(!thresholdSlider)return 57;
+        thresholdSlider->setValue(-23.0,juce::sendNotificationSync);
+        if(!readout->getText().contains("-23.0"))return 57;
         if(threshold->getBounds().intersects(ratio->getBounds()))return 20;
         // New compact primary knob row: height budget for larger black LCD
         // without collapsing control interaction areas at minimum size.
-        if(threshold->getHeight()!=82 || input->getHeight()!=82 ||
-           attack->getHeight()!=82 || ratio->getHeight()!=82) {
+        if(threshold->getHeight()!=70 || input->getHeight()!=70 ||
+           attack->getHeight()!=70 || ratio->getHeight()!=70) {
             std::cerr<<"COMPACT_KNOB_HEIGHT_52 "<<threshold->getHeight()
                 <<", "<<input->getHeight()<<", "<<attack->getHeight()
                 <<", "<<ratio->getHeight()<<'\n';
@@ -349,7 +357,7 @@ int main(int argc,char** argv) {
            !dynTab||!scTab||!range||!mix)return 21;
         // File controls are deliberately not mounted in the visible header.
         // Both independent tab views must have unclipped, non-overlapping
-        // active controls at 860 and 900px.
+        // active controls at 740 and 780px.
         if(save->isVisible()||load->isVisible()||
            !dynTab->isVisible()||!scTab->isVisible()||
            !range->isVisible()||!mix->isVisible()||!autoMode->isVisible()||
@@ -364,7 +372,7 @@ int main(int argc,char** argv) {
            autoMode->getBounds().intersects(mix->getBounds()))return 28;
         // Toggle labels now sit LEFT of their switch tracks: verify the
         // small control is still at least 100px wide and never clips.
-        if(autoMode->getWidth()<112 || bypass->getWidth()<110 ||
+        if(autoMode->getWidth()<112 || bypass->getWidth()<100 ||
            autoMode->getHeight()<27 || bypass->getHeight()<27) {
             std::cerr<<"TOGGLE_GEOMETRY_53 auto="<<autoMode->getBounds().toString()
                      <<" bypass="<<bypass->getBounds().toString()<<'\n';
@@ -434,9 +442,9 @@ int main(int argc,char** argv) {
             auto* mini=dynamic_cast<juce::TextButton*>(editor->findChildWithID("view.compact"));
             if(!mini || !mini->onClick)return 10;
             mini->onClick();
-            if(editor->getHeight()!=380)return 11;
+            if(editor->getHeight()!=330)return 11;
             auto compactImage=editor->createComponentSnapshot(editor->getLocalBounds());
-            if(compactImage.isNull() || compactImage.getHeight()!=380)return 12;
+            if(compactImage.isNull() || compactImage.getHeight()!=330)return 12;
             if(argc>1) {
                 juce::File file(juce::String::fromUTF8(argv[1]));
                 file=file.getSiblingFile(file.getFileNameWithoutExtension()+"-compact.png");
@@ -444,7 +452,7 @@ int main(int argc,char** argv) {
                 if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
             }
             mini->onClick();
-            if(editor->getHeight()!=765)return 14;
+            if(editor->getHeight()!=640)return 14;
         }
         auto image=editor->createComponentSnapshot(editor->getLocalBounds());
         if(image.isNull())return 3;

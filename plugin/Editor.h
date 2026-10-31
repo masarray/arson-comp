@@ -10,8 +10,6 @@ public:
     void drawLinearSlider(juce::Graphics&,int,int,int,int,float,float,float,
                           const juce::Slider::SliderStyle,juce::Slider&) override;
     void drawToggleButton(juce::Graphics&,juce::ToggleButton&,bool,bool) override;
-    void drawTooltip(juce::Graphics&,const juce::String&,int,int) override;
-    juce::Font getSliderPopupFont(juce::Slider&) override;
 private:
     struct FaceCache { int pixels=0; juce::Image face; };
     std::array<FaceCache,2> faces; // normal + oversized Threshold only
@@ -30,6 +28,7 @@ public:
     void mouseDrag(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
+    void mouseEnter(const juce::MouseEvent&) override;
 private:
     void timerCallback() override;
     void applyPreset(int);
@@ -42,11 +41,14 @@ private:
     void paintCompactMeters(juce::Graphics&);
     void rebuildHistoryPaths();
     void syncPanelVisibility();
+    void updateHoverReadout(std::size_t);
+    bool focusHoveredSlider(const juce::MouseEvent&);
     Processor& processor;
     CompLook look;
-    juce::TooltipWindow tooltip{this,220};
     std::array<juce::Slider,arson::Detector> knobs;
     std::array<juce::Label,arson::Detector> labels;
+    juce::Label hoverReadout;
+    std::size_t hoveredParameter=arson::Threshold;
     using SliderAttachment=juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment=juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::array<std::unique_ptr<SliderAttachment>,arson::Detector> attachments;
@@ -60,7 +62,7 @@ private:
     arson::Parameters alternate, presetSnapshot;
     bool alternateActive=false;
     bool compactMode=false,thresholdDragging=false,sidechainPanel=false;
-    int expandedWidth=900,expandedHeight=765;
+    int expandedWidth=780,expandedHeight=640;
     std::array<arson::MeterFrame,400> history{};
     std::size_t head=0;
     float inputDb=-120,outputDb=-120,gr=0;
