@@ -35,6 +35,20 @@ public:
     void mouseMove(const juce::MouseEvent&) override;
     void mouseEnter(const juce::MouseEvent&) override;
 private:
+    class GraphCanvas final : public juce::Component {
+    public:
+        explicit GraphCanvas(Editor& p) : owner(p) {
+            setComponentID("view.graph.canvas");
+            setOpaque(true);
+        }
+        void paint(juce::Graphics&) override;
+        void mouseDown(const juce::MouseEvent&) override;
+        void mouseDrag(const juce::MouseEvent&) override;
+        void mouseUp(const juce::MouseEvent&) override;
+        void mouseMove(const juce::MouseEvent&) override;
+    private:
+        Editor& owner;
+    };
     void timerCallback() override;
     void applyPreset(int);
     void setValue(std::size_t,float);
@@ -52,6 +66,7 @@ private:
     CompLook look;
     std::array<juce::Slider,arson::Detector> knobs;
     std::array<juce::Label,arson::Detector> labels;
+    GraphCanvas graphCanvas{*this};
     juce::Label hoverReadout;
     std::size_t hoveredParameter=arson::Threshold;
     using SliderAttachment=juce::AudioProcessorValueTreeState::SliderAttachment;
