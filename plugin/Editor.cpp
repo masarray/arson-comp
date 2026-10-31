@@ -255,13 +255,31 @@ void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
         g.setColour(juce::Colour{0xffffb0b6}.withAlpha(0.46f));
         g.fillRect(left,cy-0.55f,position-left,1.1f);
     }
+    // A proportional photographic thumb is too dark against the new chassis
+    // at 580-612px. Give it a bright metal silhouette and a tactile centre
+    // marker UNDER/OVER the original asset (never stretch or replace it).
+    // This makes the current value visible even when the LED fill is zero.
+    const auto thumbBack=thumb.expanded(1.2f,0.4f);
+    g.setColour(juce::Colour{0xffabb6bb});
+    g.fillRoundedRectangle(thumbBack,2.5f);
+    g.setColour(juce::Colour{0xff11181c});
+    g.fillRoundedRectangle(thumbBack.reduced(1.1f),2.0f);
     if(sliderThumb.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
         g.drawImage(sliderThumb,thumb);
     } else {
-        g.setColour(juce::Colour{0xffb5bec1});
-        g.fillRoundedRectangle(thumb,3.0f);
+        g.setColour(juce::Colour{0xff929fa5});
+        g.fillRoundedRectangle(thumb,2.5f);
     }
+    // Draw a narrow light-catching ridge over the image. The centre marker
+    // must move with thumb at both extremes and at all supported widths.
+    const float ridgeX=thumb.getCentreX();
+    g.setColour(juce::Colour{0xffc8d0d2}.withAlpha(0.9f));
+    g.drawVerticalLine(juce::roundToInt(ridgeX),thumb.getY()+3.0f,
+                       thumb.getBottom()-3.0f);
+    g.setColour(juce::Colour{0xff5f6a70}.withAlpha(0.8f));
+    g.drawVerticalLine(juce::roundToInt(ridgeX+2.0f),
+                       thumb.getY()+4.0f,thumb.getBottom()-4.0f);
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
                                  bool highlighted,bool down) {
