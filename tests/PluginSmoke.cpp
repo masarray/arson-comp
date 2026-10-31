@@ -678,10 +678,13 @@ static int runSmoke(int argc,char** argv) {
                 editor->findChildWithID("view.presets"));
             auto* browser=editor->findChildWithID("view.preset.browser");
             if(!combo||!browser||browser->isVisible())return 79;
-            combo->setSelectedId(1000,juce::sendNotificationSync);
-            // Some JUCE ComboBox/host combinations deliver the change after
-            // the popup selection message has finished. Allow that dispatch
-            // before testing visibility, rather than requiring re-entrant GUI.
+            // Programmatic selection does not reproduce a native menu
+            // click on every JUCE host. Invoke the real installed callback
+            // explicitly to test the application command deterministically.
+            combo->setSelectedId(1000,juce::dontSendNotification);
+            if(!combo->onChange)return 84;
+            combo->onChange();
+            // The browser opens asynchronously after the ComboBox closes.
             if(!browser->isVisible()) {
                 juce::Timer::callAfterDelay(75,[]{
                     juce::MessageManager::getInstance()->stopDispatchLoop();
@@ -753,6 +756,7 @@ static int runSmoke(int argc,char** argv) {
             file.deleteFile();auto stream=file.createOutputStream();if(!stream || !juce::PNGImageFormat{}.writeImageToStream(image,*stream))return 4;}
     }
     processor.releaseResources();std::cout<<"PASS: state round-trip, audio, zero latency, editor resize/reopen/render\n";
+    return 0;
 }
 
 int main(int argc,char** argv) {
