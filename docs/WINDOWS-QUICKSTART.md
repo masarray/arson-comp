@@ -11,7 +11,7 @@ Run `Standalone/ArSonComp.exe`. Select the input/output device in the standalone
 1. Copy the **entire** folder `Plugin/ArSonComp.vst3` to `C:\Program Files\Common Files\VST3\` (administrator permission may be needed).
 2. Restart or rescan VST3 in a compatible host.
 3. Insert ArSonComp on a track or bus. Start with ratio 2:1–4:1 and lower Threshold until you see approximately 3–6 dB gain reduction.
-4. Compare Clean, Feedback and Smooth at matched output loudness. Try MINI/FULL, drag the gold threshold marker, and use SAVE/OPEN for your own `.arsoncomp` preset.
+4. Compare Clean, Feedback and Smooth at matched output loudness. Try MINI/FULL, drag the white threshold marker, and use SAVE/OPEN for your own `.arsoncomp` preset.
 5. Verify external sidechain routing only if your host exposes and connects the sidechain bus. Switch Listen SC off before normal use.
 
 ## C. Quick test checklist
@@ -19,7 +19,7 @@ Run `Standalone/ArSonComp.exe`. Select the input/output device in the standalone
 - Vocal: listen for pumping, sibilance, level consistency and dry/wet behavior.
 - Bass: use low frequencies and aggressive attack to check distortion and filter interactions.
 - Transients: check drums with attack/hold/release; zero lookahead is not a true-peak limiter.
-- UI: switch MINI/FULL; resize to 920x620 and 1040x680; verify labels and metering.
+- UI: switch MINI/FULL; resize to 740x585 and 780x640, then try a larger window. Confirm bottom LCD value readout, labels, metering, and HP/LP controls.
 - Project: save, close, reload; confirm host parameters, style, bypass and input/output routing.
 - For performance, use multiple instances in your host and compare CPU with plugin editors hidden/visible.
 
@@ -33,9 +33,11 @@ FabFilter Pro-C is an independent benchmark for workflow/quality only. No FabFil
 
 Check upper central transfer graph, red fading curve and live gain reduction line, left input stereo LED meters, right GR and output stereo LEDs, and enlarged Threshold knob. Check the default/minimum/MINI screenshots from this commit, not a previous ZIP. No lookahead is present in the zero-added-sample live signal path.
 
-### Focused GUI revision
+### Compact responsive GUI and bottom-of-LCD value display
 
-The current test build opens at 900×765 instead of 1120×760. Minimum resizable size is 860×700; MINI is 380px high, and FULL restores the previous expanded dimensions. Check that all header elements fit, HP/LP and detector AUTO/EXT SC/LISTEN do not collide, and that long explanations appear in tooltips. With a running signal, verify smooth meter/GR motion against the exact audio; smoothing is UI only, with zero extra DSP samples.
+The editor now defaults to **780×640**, with **740×585** minimum full size and **330px** high MINI. FULL restores the preceding expanded dimensions. The primary rotary row is shorter, Sidechain positions adapt to the editor width, and the actual meter/graph canvas retains useful space.
+
+Hover or drag **any** rotary knob or horizontal slider to show its name, exact value and unit in the **bottom centre of the black LCD**. The last focused value remains visible rather than flashing away. MINI uses the right-hand footer for the readout. There are **no overlay value bubbles or TooltipWindow**, so nothing obscures the controls. Double-click a knob or slider to restore its factory value. The JUCE APVTS host-automation attachments and audio DSP remain unchanged.
 
 ### Two-sided dissolve, low-cost LED metering
 
@@ -43,15 +45,15 @@ Use the Standalone EXE or VST3 from the **latest** matching Windows Actions arti
 
 ### Metal controls and decluttered header
 
-All primary knobs now mimic machined/brushed aluminium with a black recessed channel and a coral (not green) value sector. Hover or double-click any knob to discover its range/reset, or type a numerical value. Click **FILE** in the header to open Save/Open options for your .arsoncomp user presets; the previous separate SAVE/OPEN buttons are now intentionally removed. Switch the footer between **DYNAMICS** and **SIDECHAIN** for advanced detector filters and monitoring. Switching pages does not change or reset audio parameters. Compare all four screenshots (default, minimum, MINI, SIDECHAIN), then validate physically in Standalone or your VST3 host.
+All primary knobs now mimic machined/brushed aluminium with a black recessed channel and a coral (not green) value sector. Hover any knob or slider to see its current value in the LCD footer; double-click to restore the default. Click **FILE** in the header to open Save/Open options for your .arsoncomp user presets; the previous separate SAVE/OPEN buttons are now intentionally removed. Switch the footer between **DYNAMICS** and **SIDECHAIN** for advanced detector filters and monitoring. Switching pages does not change or reset audio parameters. Compare all four screenshots (default, minimum, MINI, SIDECHAIN), then validate physically in Standalone or your VST3 host.
 
 ### Live-host readiness checks (new)
 
 Run the supplied Standalone on your audio interface and load the complete VST3 in a DAW or ArSonMiX. Start with 48 kHz and a 128-sample host buffer; repeat at 64 then 32 samples where stable. Route a mono kick/mic into the VST3 external Sidechain bus on a stereo track: when **EXT SC** is selected, a strong detector signal must attenuate the main stereo channels while preserving their balance; switching it off must restore internal detection. Try host Bypass at +12 dB Input and Makeup, preset save/reopen, MINI/full, then stop transport and confirm the last dynamics trace clears rather than freezing. Real driver round-trip latency is separate from the plugin's zero additional algorithmic samples.
 
-### New compact controls and value popups
+### Hardware knob and gunmetal slider controls
 
-All knobs now show a larger coral arc **behind** the black metal asset and a small coral pointer dot near the rim. The numerical boxes under knobs/sliders have been removed for an uncluttered control strip: hover for current value/unit tooltip, drag for a transient value bubble, and double-click a knob to restore its factory value. All AUTO/EXT SC/LISTEN and header ACTIVE/BYPASS controls use small track switches. The linear sliders use the original user-supplied PAN-SLIDER black metallic thumb. This is GUI-only; zero added algorithmic DSP samples are unchanged.
+All rotary knobs retain their coral sector behind the black brushed-metal face and a small coral pointer dot near the rim. The numerical text boxes are removed. Horizontal Range/Hold/Mix/Link/HP/LP faders render a **stationary gunmetal rail**, coral-red recessed level and a **moving gunmetal thumb in front**. They use the same JUCE parameter controls as before, without changing audio behavior. AUTO/EXT SC/LISTEN and ACTIVE/BYPASS use compact left-caption toggles.
 
 ### Premium brushed-metal and glass UI
 
