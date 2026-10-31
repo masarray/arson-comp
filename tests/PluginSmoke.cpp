@@ -650,10 +650,6 @@ static int runSmoke(int argc,char** argv) {
             }
             processor.processBlock(buffer,midi);
         }
-        if(iteration==0) {
-            juce::Timer::callAfterDelay(120,[]{juce::MessageManager::getInstance()->stopDispatchLoop();});
-            juce::MessageManager::getInstance()->runDispatchLoop();
-        }
         if(iteration==1 && argc>1) {
             // Use the populated signal history and active desktop renderer
             // for a useful visual review of the Sidechain page.
@@ -672,8 +668,13 @@ static int runSmoke(int argc,char** argv) {
                 return 31;
             mainTab->onClick();
         }
+        // Exercise asynchronous ComboBox->browser opening in the FIRST
+        // JUCE dispatch loop. A previous stopDispatchLoop() may leave a
+        // native Windows quit event pending; restarting the loop is not a
+        // reliable test of the browser and produces a false failure 80.
+        // The first loop also drives meter animation for GUI snapshots.
         // Search browser is a genuine in-plugin overlay with rich metadata.
-        if(iteration==3) {
+        if(iteration==0) {
             auto* combo=dynamic_cast<juce::ComboBox*>(
                 editor->findChildWithID("view.presets"));
             auto* browser=editor->findChildWithID("view.preset.browser");
@@ -686,7 +687,7 @@ static int runSmoke(int argc,char** argv) {
             combo->onChange();
             // The browser opens asynchronously after the ComboBox closes.
             if(!browser->isVisible()) {
-                juce::Timer::callAfterDelay(75,[]{
+                juce::Timer::callAfterDelay(120,[]{
                     juce::MessageManager::getInstance()->stopDispatchLoop();
                 });
                 juce::MessageManager::getInstance()->runDispatchLoop();
