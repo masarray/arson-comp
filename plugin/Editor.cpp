@@ -48,6 +48,13 @@ CompLook::CompLook() {
         BinaryData::gunmetal_slider_thumb_red_png,
         static_cast<std::size_t>(BinaryData::gunmetal_slider_thumb_red_pngSize));
     jassert(sliderTrack.isValid() && sliderThumb.isValid());
+    if(sliderTrack.isValid()) {
+        constexpr int cap=37;
+        const int width=sliderTrack.getWidth(),height=sliderTrack.getHeight();
+        sliderCapLeft=sliderTrack.getClippedImage({0,0,cap,height});
+        sliderCentre=sliderTrack.getClippedImage({cap,0,width-2*cap,height});
+        sliderCapRight=sliderTrack.getClippedImage({width-cap,0,cap,height});
+    }
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colour{0xff31383e});
@@ -145,21 +152,19 @@ void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
     // Photo plate is stationary. Nine-slice horizontally (3 segments)
     // preserves realistic endcaps at both the short and 170px SC sliders.
     if(sliderTrack.isValid()) {
-        constexpr float srcCap=37.0f, dstCap=18.0f;
-        const float srcW=static_cast<float>(sliderTrack.getWidth());
-        const float srcH=static_cast<float>(sliderTrack.getHeight());
+        constexpr float dstCap=18.0f;
         const float top=cy-plateH*0.5f;
         const float midW=juce::jmax(0.0f,plateW-2.0f*dstCap);
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImage(sliderTrack,
-            juce::Rectangle<float>{plateX,top,dstCap,plateH},
-            juce::Rectangle<float>{0.0f,0.0f,srcCap,srcH});
-        g.drawImage(sliderTrack,
-            juce::Rectangle<float>{plateX+dstCap,top,midW,plateH},
-            juce::Rectangle<float>{srcCap,0.0f,srcW-2.0f*srcCap,srcH});
-        g.drawImage(sliderTrack,
-            juce::Rectangle<float>{plateX+plateW-dstCap,top,dstCap,plateH},
-            juce::Rectangle<float>{srcW-srcCap,0.0f,srcCap,srcH});
+        // JUCE 8's Graphics::drawImage takes a target Rectangle and optional
+        // RectanglePlacement, NOT a source Rectangle. Preclip these three
+        // views once in CompLook constructor, never inside paint().
+        g.drawImage(sliderCapLeft,
+            juce::Rectangle<float>{plateX,top,dstCap,plateH});
+        g.drawImage(sliderCentre,
+            juce::Rectangle<float>{plateX+dstCap,top,midW,plateH});
+        g.drawImage(sliderCapRight,
+            juce::Rectangle<float>{plateX+plateW-dstCap,top,dstCap,plateH});
     } else {
         g.setColour(juce::Colour{0xff282d31});
         g.fillRoundedRectangle(plateX,cy-14.0f,plateW,28.0f,7.0f);
