@@ -155,10 +155,13 @@ int main(int argc,char** argv) {
         buses.outputBuses.set(0,juce::AudioChannelSet::mono());
         if(!mono.setBusesLayout(buses) || mono.getTotalNumInputChannels()!=1)
             return failHost(44);
-        mono.prepareToPlay(48000,32);
+        // Configure unity before prepareToPlay so the test explicitly
+        // measures an initially-unity mono instance rather than a 5ms
+        // smoothed transition from its factory 4:1 default.
         auto* unity=mono.state.getParameter("ratio");
         if(!unity)return failHost(45);
         unity->setValueNotifyingHost(unity->convertTo0to1(1.0f));
+        mono.prepareToPlay(48000,32);
         juce::AudioBuffer<float> audio(1,32);
         juce::MidiBuffer midi;
         for(int i=0;i<32;++i)audio.setSample(0,i,0.123f);
