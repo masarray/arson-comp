@@ -88,3 +88,9 @@ Plugin smoke captures default, minimum, MINI and **Sidechain** layouts; asserts 
 ## Black brushed metal knob asset (reference-derived)
 
 The main dials now use a **real bundled black brushed-metal picture**, based on the user's silver radial-knob image. A 96×96 optimized JPEG is checked into `assets/black_brushed_knob.jpg` and linked into JUCE's binary resource target. The corresponding generated high-resolution transparent PNG master remains available from the design session. At plugin creation, `CompLook` decodes the bundled image **once on the GUI thread**. Each primary/Threshold dial cache resizes it with a circular alpha clip only when its geometry changes. Repaint overlays the existing live coral arc/needle, with no disk/network access, per-frame image decode, or DSP/audio-thread change. The plugin smoke suite asserts resource existence, dimensions and nonempty tonal detail.
+
+## Live-host readiness: bus routing, stopped-transport display
+
+The Windows VST3/Standalone test artifact is not merely a GUI mockup: CI now also drives the actual JUCE processor with stereo main audio and an enabled **mono external sidechain bus**, using 32, 64 and 128 sample blocks. It verifies expected 4:1 compression from a sidechain signal, internal detector restoration, host bypass that ignores Input/Makeup, and unchanged zero added sample latency; a separate mono main-bus test guards live microphone processing. The DSP core, all parameter IDs and CPU-cost path remain unchanged.
+
+The graph's fixed four-second history now advances into silence when the host stops calling the audio callback, instead of displaying a permanently frozen old compression trace. This ageing uses bounded UI-thread-only ring writes at the prior 100 Hz telemetry cadence and automatically stops once the ring is clear. It allocates no worker, buffer, or audio-thread work.

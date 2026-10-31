@@ -1,7 +1,7 @@
 name: Validate and build
 on:
   pull_request:
-    paths: ['engine/**', 'plugin/**', 'tests/**', 'CMakeLists.txt', 'docs/WINDOWS-QUICKSTART.md', '.github/workflows/**']
+    paths: ['engine/**', 'plugin/**', 'assets/**', 'tests/**', 'CMakeLists.txt', 'docs/WINDOWS-QUICKSTART.md', '.github/workflows/**']
   workflow_dispatch:
 permissions:
   contents: read

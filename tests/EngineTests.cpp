@@ -1,4 +1,5 @@
 #include "Compressor.h"
+#include "../plugin/GraphHistory.h"
 #include <atomic>
 #include <cstdlib>
 #include <iostream>
@@ -19,6 +20,25 @@ bool near(float a,float b,float tolerance=1.0e-4f) { return std::abs(a-b)<=toler
 int main() {
     using namespace arson;
     require(Compressor::latencySamples()==0,"reported zero latency");
+    {
+        // UI-only stopped-transport history must become silent and must
+        // stop after one full ring instead of painting forever.
+        std::array<MeterFrame,16> history{};
+        for(auto& f:history){ f.input=0.5f;f.output=0.25f;f.reduction=6.0f; }
+        std::size_t head=0,aged=0;
+        require(ui::ageStoppedHistory(history,head,aged,6)==6,
+                "first idle graph frame batch");
+        require(head==6 && aged==6 && history[5].input==0,
+                "idle frames written in ring order");
+        require(ui::ageStoppedHistory(history,head,aged,30)==10,
+                "idle frame write capped to ring");
+        require(head==0 && aged==16,"idle graph ring bounded");
+        for(const auto& frame:history)
+            require(frame.input==0 && frame.output==0 && frame.reduction==0,
+                    "stopped transport clears frozen history");
+        require(ui::ageStoppedHistory(history,head,aged,30)==0,
+                "silent history stops rebuilding when empty");
+    }
     require(near(reduction(0,-20,4,0,60),15),"4:1 static curve");
     require(near(reduction(-20,-20,4,8,60),0.75f),"soft-knee midpoint");
     require(near(reduction(0,-20,4,0,6),6),"range limit");

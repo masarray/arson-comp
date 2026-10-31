@@ -55,3 +55,9 @@ Maintainability: one `syncPanelVisibility()` is the only source of truth for sec
 ## Integrated black radial-knob resource
 
 `assets/black_brushed_knob.jpg` is the compact 96×96 compressed build-time image source derived from the user's supplied silver image, recolored to deep gunmetal. The asset has realistic specular radial brush-work; it replaces simulated 72-circle procedural grain. `juce_add_binary_data(ArSonCompKnobAssets)` turns it into compile-time resources used by the VST3, Standalone and GUI smoke tests. `CompLook::CompLook` loads JPEG from `BinaryData` one time on the message thread; `knobFace` composites a round-cropped ARGB tile at the standard/Threshold sizes and caches both. The dynamic coral arc and value marker stay overlay vector geometry. Binary resource checks prevent an empty knob when host paths differ. No changes to DSP, parameter IDs, allocation in audio callbacks or added latency.
+
+## Real host routing and stale-graph lifecycle
+
+`plugin_smoke` now configures JUCE's actual main stereo + mono Sidechain buses and calls `Processor::processBlock()` at 32, 64 and 128 frames, with a known one-second detector signal. Assert expected compression, independent stereo scaling, sidechain input buffer intact, internal detector recovery, host bypass transparency after 5ms automation smoothing, and reported zero additional DSP samples. Run a separate mono/no-sidechain bus case. These tests validate JUCE bus offsets rather than only the library-level `Compressor::process` tests.
+
+`plugin/GraphHistory.h` contains one JUCE-free, bounded GUI-ring ageing helper. The editor timestamps the last actual telemetry, then after 150 ms without producer frames advances the history with silent samples at ~100Hz based on UI clock. The helper caps inserts to 400 frames, then stops; actual metering still comes solely through the original SPSC queue. The audio engine and thread never touch history or timestamps.

@@ -44,3 +44,7 @@ Use the Standalone EXE or VST3 from the **latest** matching Windows Actions arti
 ### Metal controls and decluttered header
 
 All primary knobs now mimic machined/brushed aluminium with a black recessed channel and a coral (not green) value sector. Hover or double-click any knob to discover its range/reset, or type a numerical value. Click **FILE** in the header to open Save/Open options for your .arsoncomp user presets; the previous separate SAVE/OPEN buttons are now intentionally removed. Switch the footer between **DYNAMICS** and **SIDECHAIN** for advanced detector filters and monitoring. Switching pages does not change or reset audio parameters. Compare all four screenshots (default, minimum, MINI, SIDECHAIN), then validate physically in Standalone or your VST3 host.
+
+### Live-host readiness checks (new)
+
+Run the supplied Standalone on your audio interface and load the complete VST3 in a DAW or ArSonMiX. Start with 48 kHz and a 128-sample host buffer; repeat at 64 then 32 samples where stable. Route a mono kick/mic into the VST3 external Sidechain bus on a stereo track: when **EXT SC** is selected, a strong detector signal must attenuate the main stereo channels while preserving their balance; switching it off must restore internal detection. Try host Bypass at +12 dB Input and Makeup, preset save/reopen, MINI/full, then stop transport and confirm the last dynamics trace clears rather than freezing. Real driver round-trip latency is separate from the plugin's zero additional algorithmic samples.

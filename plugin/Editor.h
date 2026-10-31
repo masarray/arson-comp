@@ -61,7 +61,8 @@ private:
     std::array<arson::MeterFrame,400> history{};
     std::size_t head=0;
     float inputDb=-120,outputDb=-120,gr=0;
-    double lastUiTickMs=0.0;
+    double lastUiTickMs=0.0,lastTelemetryMs=0.0;
+    std::size_t idleHistoryFrames=0;
     std::array<float,2> inChannelDb{{-120.0f,-120.0f}},outChannelDb{{-120.0f,-120.0f}};
     int currentChannels=2;
     juce::Rectangle<int> display;

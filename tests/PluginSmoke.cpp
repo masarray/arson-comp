@@ -79,6 +79,81 @@ int main(int argc,char** argv) {
         if(base.getPixelAt(48,48).getBrightness()<0.08f ||
            base.getPixelAt(48,48).getBrightness()>0.90f)return 34;
     }
+    // True JUCE bus-routing contract: test the processor entrypoint, not
+    // just the DSP engine, using 2 main channels and a host mono SC bus.
+    // Covers 32/64/128-frame hardware-like blocks and host bypass.
+    for(const int blockSize : {32,64,128}) {
+        Processor live;
+        auto buses=live.getBusesLayout();
+        if(buses.inputBuses.size()<2) return 35;
+        buses.inputBuses.set(1,juce::AudioChannelSet::mono());
+        if(!live.setBusesLayout(buses) ||
+           live.getTotalNumInputChannels()!=3 ||
+           live.getTotalNumOutputChannels()!=2)return 36;
+        live.prepareToPlay(48000.0,blockSize);
+        auto set=[&](const char* id,float value) {
+            auto* parameter=live.state.getParameter(id);
+            if(!parameter)return false;
+            parameter->setValueNotifyingHost(parameter->convertTo0to1(value));
+            return true;
+        };
+        if(!set("threshold",-20.0f)||!set("ratio",4.0f)||
+           !set("knee",0.0f)||!set("external",1.0f))return 37;
+
+        juce::AudioBuffer<float> signal(3,blockSize);
+        juce::MidiBuffer midi;
+        const auto process=[&](bool bypassed) {
+            for(int i=0;i<blockSize;++i) {
+                signal.setSample(0,i,0.05f);
+                signal.setSample(1,i,0.025f);
+                signal.setSample(2,i,1.0f); // mono external detector
+            }
+            if(bypassed) live.processBlockBypassed(signal,midi);
+            else live.processBlock(signal,midi);
+        };
+        const int warmup=48000/blockSize;
+        for(int b=0;b<warmup;++b)process(false);
+        const float gain=arson::dbToGain(-15.0f);
+        if(std::abs(signal.getSample(0,blockSize-1)-0.05f*gain)>0.002f ||
+           std::abs(signal.getSample(1,blockSize-1)-0.025f*gain)>0.002f ||
+           signal.getSample(2,blockSize-1)!=1.0f)return 38;
+
+        // The sidechain is still physically present; switching to internal
+        // detection must recover naturally without rewiring the host buffer.
+        if(!set("external",0.0f))return 39;
+        for(int b=0;b<warmup;++b)process(false);
+        if(std::abs(signal.getSample(0,blockSize-1)-0.05f)>0.002f ||
+           std::abs(signal.getSample(1,blockSize-1)-0.025f)>0.002f)return 40;
+
+        // Host bypass path must ignore Input/Makeup and output the exact
+        // input waveform after the finite click-avoidance transition.
+        if(!set("input",12.0f)||!set("makeup",12.0f))return 41;
+        for(int b=0;b<12;++b)process(true);
+        if(std::abs(signal.getSample(0,blockSize-1)-0.05f)>1.0e-5f ||
+           std::abs(signal.getSample(1,blockSize-1)-0.025f)>1.0e-5f)
+            return 42;
+        if(live.getLatencySamples()!=0)return 43;
+    }
+    {
+        // The optional SC bus must not break mono, sidechain-disabled
+        // host layouts (live speech / karaoke mic use case).
+        Processor mono;
+        auto buses=mono.getBusesLayout();
+        buses.inputBuses.set(0,juce::AudioChannelSet::mono());
+        buses.outputBuses.set(0,juce::AudioChannelSet::mono());
+        if(!mono.setBusesLayout(buses) || mono.getTotalNumInputChannels()!=1)
+            return 44;
+        mono.prepareToPlay(48000,32);
+        auto* unity=mono.state.getParameter("ratio");
+        if(!unity)return 45;
+        unity->setValueNotifyingHost(unity->convertTo0to1(1.0f));
+        juce::AudioBuffer<float> audio(1,32);
+        juce::MidiBuffer midi;
+        for(int i=0;i<32;++i)audio.setSample(0,i,0.123f);
+        mono.processBlock(audio,midi);
+        if(std::abs(audio.getSample(0,0)-0.123f)>1.0e-6f ||
+           std::abs(audio.getSample(0,31)-0.123f)>1.0e-6f)return 46;
+    }
     Processor processor;processor.prepareToPlay(48000,128);
     if(processor.getLatencySamples()!=0) return 1;
     auto* parameter=processor.state.getParameter("threshold");parameter->setValueNotifyingHost(parameter->convertTo0to1(-27));

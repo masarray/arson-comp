@@ -1,6 +1,7 @@
 #include "Editor.h"
 #include "PresetIO.h"
 #include "GraphPaint.h"
+#include "GraphHistory.h"
 #include "BinaryData.h"
 #include <cmath>
 #include <algorithm>
@@ -563,7 +564,18 @@ void Editor::timerCallback() {
         outChannelDb[i]=approachVisual(outChannelDb[i],
             arson::gainToDb(outPeaks[i]),elapsed,0.018,0.210);
     }
-    if(!compactMode && received>0)rebuildHistoryPaths();
+    // A stopped host produces no meter frames. Without a bounded idle
+    // drain, the last four seconds of trace remain frozen forever.
+    // Advance at the original 100-Hz history rate using GUI time only.
+    std::size_t aged=0;
+    if(received>0) {
+        lastTelemetryMs=now;
+        idleHistoryFrames=0;
+    } else if(lastTelemetryMs>0.0 && now-lastTelemetryMs>150.0) {
+        aged=arson::ui::ageStoppedHistory(history,head,idleHistoryFrames,
+            std::max(1,static_cast<int>(std::round(elapsed*100.0))));
+    }
+    if(!compactMode && (received>0 || aged>0))rebuildHistoryPaths();
     if(compactMode)repaint(14,298,getWidth()-28,57);
     else repaint(display);
 }

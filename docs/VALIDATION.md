@@ -45,3 +45,10 @@ Verify default 1120x760, minimum 960x670 and compact 380px Windows screenshot ge
 - Verify default DYNAMICS page shows Range, Hold, Mix, Link and AUTO and hides detector/HP/LP/EXT/LISTEN. Switch to SIDECHAIN and verify complementary visibility plus zero overlap, then restore; repeat at min 860×700 and MINI 380px.
 - CI emits a fourth SIDECHAIN screenshot, additional to default/minimum/MINI; use screenshot review to identify any actual clipping. Knob cache is allocated only on GUI thread, at most once per changed diameter per role; all animation/LED metering remains unchanged.
 - Pro-C-grade DSP parity, pluginval, multi-instance real CPU, host automation reliability and hardware 32/64/128 sample tests remain release gates.
+
+## Live host-signal and transport-stop acceptance
+
+- Windows `plugin_state_editor` now uses JUCE's *real bus layout*: stereo main + mono external sidechain at 32/64/128 frames. Verify after 1 s of main 0.05/0.025 and sidechain 1.0 that output is close to the predicted 15 dB reduction (threshold -20 dB, 4:1 hard knee), side input remains 1.0 and stereo ratio remains 2:1.
+- Toggle external-to-internal with unchanged sidechain bus: signal must recover to 0.05/0.025. Assert host bypass restores unchanged input after smoothing, ignores +12 dB Input/Makeup, and reports zero algorithmic sample latency.
+- Validate mono main, no external SC and 1:1 unity ratio, at 32 samples. No host-bus memory boundary crossing.
+- Engine regression checks UI-only 16-frame ring ageing: 6 frames first, exactly 10 remaining, no more writes after the ring is cleared. Playback must not display frozen GR history after host stops; physical latency/dropout validation is still pending.
