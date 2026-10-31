@@ -387,28 +387,49 @@ int main(int argc,char** argv) {
     file.deleteFile();
     juce::AudioBuffer<float> buffer(2,128);juce::MidiBuffer midi;
     for(int j=0;j<1000;++j) {buffer.clear();buffer.setSample(0,0,0.5f);processor.processBlock(buffer,midi);}
-    // Full toolbar geometry across minimum/default/wide editor widths:
-    // consistent 10px gaps, uniform baseline and bounded preset dropdown.
-    for(const int width : {740,780,900,1200}) {
+    // WCAG contrast checks for both caption layers at their real materials.
+    // These deliberately fail if captions regress to faint gray on gray.
+    {
+        const auto luminance=[](juce::Colour c) {
+            const auto channel=[](float v) {
+                return v<=0.04045f ? v/12.92f:
+                    std::pow((v+0.055f)/1.055f,2.4f);
+            };
+            return 0.2126f*channel(c.getFloatRed())+
+                   0.7152f*channel(c.getFloatGreen())+
+                   0.0722f*channel(c.getFloatBlue());
+        };
+        const auto contrast=[&](juce::Colour fg,juce::Colour bg) {
+            const auto a=luminance(fg),b=luminance(bg);
+            return (std::max(a,b)+0.05f)/(std::min(a,b)+0.05f);
+        };
+        if(contrast(juce::Colour{arson::ui::EditorMetrics::controlCaptionRgb},
+                    juce::Colour{arson::ui::EditorMetrics::metalBackgroundRgb})<4.5f ||
+           contrast(juce::Colour{arson::ui::EditorMetrics::captionRgb},
+                    juce::Colour{arson::ui::EditorMetrics::headerBackgroundRgb})<4.5f)
+            return 66;
+    }
+    // Header invariants for minimum, default, legacy and maximum widths.
+    for(const int width : {660,704,780,1040}) {
         const auto h=arson::ui::HeaderLayout::calculate(width);
         const std::array<juce::Rectangle<int>,7> fields{
             h.logo,h.mini,h.model,h.preset,h.compare,h.file,h.bypass};
-        if(h.preset.getWidth()<144||h.preset.getWidth()>176||
-           h.bypass.getRight()!=width-14||h.logo.getX()!=14)return 62;
+        if(h.preset.getWidth()<124||h.preset.getWidth()>154||
+           h.bypass.getRight()!=width-12||h.logo.getX()!=12)return 62;
         for(std::size_t i=1;i<fields.size();++i) {
-            if(fields[i].getX()-fields[i-1].getRight()<10 ||
-               fields[i].getRight()>width-14 ||
+            if(fields[i].getX()-fields[i-1].getRight()<8 ||
+               fields[i].getRight()>width-12 ||
                fields[i].getWidth()<=0)return 63;
-            if(fields[i].getY()!=24||fields[i].getHeight()!=28)return 64;
+            if(fields[i].getY()!=22||fields[i].getHeight()!=27)return 64;
         }
     }
     for(int iteration=0;iteration<8;++iteration) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
-        editor->setSize(iteration%2 ? 740 : 780,iteration%2 ? 585 : 640);
-        if(editor->getWidth()!=(iteration%2 ? 740 : 780) ||
-           editor->getHeight()!=(iteration%2 ? 585 : 640))return 9;
+        editor->setSize(iteration%2 ? 660 : 704,iteration%2 ? 490 : 520);
+        if(editor->getWidth()!=(iteration%2 ? 660 : 704) ||
+           editor->getHeight()!=(iteration%2 ? 490 : 520))return 9;
         auto* threshold=editor->findChildWithID("param.threshold");
         auto* input=editor->findChildWithID("param.input");
         auto* ratio=editor->findChildWithID("param.ratio");
@@ -571,7 +592,7 @@ int main(int argc,char** argv) {
                 if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
             }
             mini->onClick();
-            if(editor->getHeight()!=640)return 14;
+            if(editor->getHeight()!=520)return 14;
         }
         auto image=editor->createComponentSnapshot(editor->getLocalBounds());
         if(image.isNull())return 3;

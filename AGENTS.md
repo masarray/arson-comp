@@ -14,3 +14,8 @@
 - Always reconcile the GUI development branch and M2 realtime-performance branch before producing a Windows test binary. An artifact from one branch alone is not a combined release.
 - Host bypass must pass the first block bit-exactly and must not latch the parameter bypass state. User bypass remains a smoothed, separately attached parameter.
 - Build M3 in one PR with both Windows JUCE editor smoke and Linux sanitizer, inspect four actual Windows screenshots and benchmark/stress files before declaring ready-to-test. Do not call CI throughput a hardware xrun proof.
+
+## M4 compact GUI gate
+- Default FULL 704x520, minimum 660x490; MINI remains 330 high. Do not increase default GUI size without measuring element collision and user workflow.
+- Header has no decorative separator rules. Only MODEL and PRESET need small captions; buttons self-label. Maintain >=4.5:1 contrast between static captions and their dark metal background, using the shared palette contract.
+- Inspect screenshots from compiled JUCE at default/minimum, MINI and SIDECHAIN; preserve readable controls, meters, telemetry, preset and APVTS bindings. GUI changes must never modify engine DSP or latency.
