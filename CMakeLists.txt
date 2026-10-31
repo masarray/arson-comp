@@ -49,7 +49,9 @@ if(ARSON_BUILD_PLUGIN)
   juce_add_binary_data(ArSonCompKnobAssets
     SOURCES assets/black_brushed_knob.jpg
             assets/gunmetal_slider_track.png
-            assets/gunmetal_slider_thumb_red.png)
+            assets/gunmetal_slider_thumb_red.png
+            assets/toggle/arson_toggle_on.png
+            assets/toggle/arson_toggle_off.png)
   target_sources(ArSonComp PRIVATE plugin/Processor.cpp plugin/Editor.cpp)
   if(MSVC)
     target_compile_options(ArSonComp PRIVATE /utf-8)
