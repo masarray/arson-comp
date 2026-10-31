@@ -6,6 +6,7 @@
 #include "../plugin/SurfacePaint.h"
 #include "BinaryData.h"
 #include <juce_gui_extra/juce_gui_extra.h>
+#include <juce_audio_devices/juce_audio_devices.h>
 #include <iostream>
 #include <initializer_list>
 int main(int argc,char** argv) {
