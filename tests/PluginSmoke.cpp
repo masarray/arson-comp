@@ -1,4 +1,5 @@
 #include "../plugin/Processor.h"
+#include "../plugin/Editor.h"
 #include "../plugin/PresetIO.h"
 #include "../plugin/GraphPaint.h"
 #include "../plugin/SurfacePaint.h"
