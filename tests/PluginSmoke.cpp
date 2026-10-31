@@ -2,6 +2,7 @@
 #include "../plugin/Editor.h"
 #include "../plugin/HeaderLayout.h"
 #include "../plugin/FaderGeometry.h"
+#include "../plugin/KnobGeometry.h"
 #include "../plugin/PresetIO.h"
 #include "../plugin/FactoryPresetBank.h"
 #include "../plugin/GraphPaint.h"
@@ -209,15 +210,15 @@ static int runSmoke(int argc,char** argv) {
            std::abs(audio.getSample(0,31)-0.123f)>1.0e-6f)return failHost(46);
     }
     // Hardware fader layer contract: independent transparent photo plate
-    // (stationary), photo thumb (red aperture) and moving red LED level.
+    // (stationary), dark brushed graphite thumb and moving red LED level.
     // Confirm real JUCE BinaryData resources, not external installation paths.
     {
         const auto plate=juce::ImageFileFormat::loadFrom(
             BinaryData::gunmetal_slider_track_png,
             static_cast<std::size_t>(BinaryData::gunmetal_slider_track_pngSize));
         const auto thumb=juce::ImageFileFormat::loadFrom(
-            BinaryData::gunmetal_slider_thumb_red_png,
-            static_cast<std::size_t>(BinaryData::gunmetal_slider_thumb_red_pngSize));
+            BinaryData::dark_brushed_slider_thumb_png,
+            static_cast<std::size_t>(BinaryData::dark_brushed_slider_thumb_pngSize));
         if(!plate.isValid() || plate.getWidth()!=340 || plate.getHeight()!=57 ||
            !thumb.isValid() || thumb.getWidth()!=58 || thumb.getHeight()!=124 ||
            plate.getPixelAt(0,0).getFloatAlpha()>0.04f ||
@@ -232,6 +233,23 @@ static int runSmoke(int argc,char** argv) {
             return 47;
         }
 
+        // Original dark graphite asset must not regress to a bright silver
+        // placeholder, and its real PNG corner alpha must remain transparent.
+        const auto graphite=thumb.getPixelAt(22,40);
+        if(graphite.getRed()>=85 || graphite.getGreen()>=90 ||
+           graphite.getBlue()>=95 || graphite.getFloatAlpha()<0.80f)
+            return 82;
+        // Verify the complete rotary red arc (not only its metal JPEG face)
+        // fits inside the enlarged knob hit rectangle, including stroke.
+        for(int width : {62,66,72,78,100})
+            for(bool threshold : {false,true}) {
+                const int diameter=arson::ui::KnobGeometry::facePixels(
+                    width,arson::ui::EditorMetrics::knobHeight,threshold);
+                if(arson::ui::KnobGeometry::outerPaintRadius(diameter)
+                    +arson::ui::KnobGeometry::safeInset >
+                    0.5f*std::min(width,arson::ui::EditorMetrics::knobHeight)
+                    +0.01f) return 83;
+            }
         // Maintain native track/thumb aspect ratio at every window width.
         for(float width : {70.0f,90.0f,105.0f,150.0f}) {
             for(float height : {34.0f,40.0f}) {
@@ -575,6 +593,18 @@ static int runSmoke(int argc,char** argv) {
                knob->getBounds().intersects(caption->getBounds())) {
                 std::cerr<<"KNOB_CAPTION_OVERLAP_74 "<<name<<"\n";return 74;
             }
+        }
+        for(const char* id : {"input","attack","release","threshold",
+                              "ratio","knee","makeup"}) {
+            const auto* dial=editor->findChildWithID("param."+juce::String(id));
+            if(!dial)return 84;
+            const int diameter=arson::ui::KnobGeometry::facePixels(
+                dial->getWidth(),dial->getHeight(),
+                juce::String(id)=="threshold");
+            if(arson::ui::KnobGeometry::outerPaintRadius(diameter)
+                +arson::ui::KnobGeometry::safeInset >
+                0.5f*std::min(dial->getWidth(),dial->getHeight())+0.01f)
+                return 85;
         }
         // New compact primary knob row: height budget for larger black LCD
         // without collapsing control interaction areas at minimum size.

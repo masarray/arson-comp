@@ -6,6 +6,7 @@
 #include "GraphHistory.h"
 #include "HeaderLayout.h"
 #include "FaderGeometry.h"
+#include "KnobGeometry.h"
 #include "BinaryData.h"
 #include <cmath>
 #include <algorithm>
@@ -57,8 +58,8 @@ CompLook::CompLook() {
         BinaryData::gunmetal_slider_track_png,
         static_cast<std::size_t>(BinaryData::gunmetal_slider_track_pngSize));
     sliderThumb=juce::ImageFileFormat::loadFrom(
-        BinaryData::gunmetal_slider_thumb_red_png,
-        static_cast<std::size_t>(BinaryData::gunmetal_slider_thumb_red_pngSize));
+        BinaryData::dark_brushed_slider_thumb_png,
+        static_cast<std::size_t>(BinaryData::dark_brushed_slider_thumb_pngSize));
     jassert(sliderTrack.isValid() && sliderThumb.isValid());
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
@@ -166,17 +167,14 @@ const juce::Image& CompLook::knobFace(int diameter,bool primary) {
 void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float start,float end,juce::Slider& slider) {
     const bool primary=slider.getName()=="Threshold";
-    const float r=std::max(13.0f,std::min(
-        static_cast<float>(w)*(primary?0.400f:0.385f),
-        static_cast<float>(h)*(primary?0.400f:0.385f)));
-    const int pixels=juce::jmax(28,static_cast<int>(std::ceil(r*2.0f+7.0f)));
+    const int pixels=arson::ui::KnobGeometry::facePixels(w,h,primary);
     const float cx=x+w*0.5f,cy=y+h*0.50f;
     const float angle=start+clamp01(pos)*(end-start);
     const float bodyRadius=pixels*0.5f;
     // Draw the level RING FIRST. Its radius is larger than the black metal
     // photograph, so the dial occludes the inner arc naturally, as a physical
     // knob would. Nothing gets painted on top of the metal except the dot.
-    const float trackRadius=bodyRadius+2.2f;
+    const float trackRadius=bodyRadius+arson::ui::KnobGeometry::arcOutsideFace;
     juce::Path inactive,active;
     inactive.addCentredArc(cx,cy,trackRadius,trackRadius,0.0f,start,end,true);
     active.addCentredArc(cx,cy,trackRadius,trackRadius,0.0f,start,angle,true);
@@ -255,31 +253,17 @@ void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
         g.setColour(juce::Colour{0xffffb0b6}.withAlpha(0.46f));
         g.fillRect(left,cy-0.55f,position-left,1.1f);
     }
-    // A proportional photographic thumb is too dark against the new chassis
-    // at 580-612px. Give it a bright metal silhouette and a tactile centre
-    // marker UNDER/OVER the original asset (never stretch or replace it).
-    // This makes the current value visible even when the LED fill is zero.
-    const auto thumbBack=thumb.expanded(1.2f,0.4f);
-    g.setColour(juce::Colour{0xffabb6bb});
-    g.fillRoundedRectangle(thumbBack,2.5f);
-    g.setColour(juce::Colour{0xff11181c});
-    g.fillRoundedRectangle(thumbBack.reduced(1.1f),2.0f);
+    // Single original graphite brushed-metal asset with bevel/grip built in.
+    // No overlaid silver lines or faux bezel; the PNG is drawn only once.
     if(sliderThumb.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
         g.drawImage(sliderThumb,thumb);
     } else {
-        g.setColour(juce::Colour{0xff929fa5});
-        g.fillRoundedRectangle(thumb,2.5f);
+        g.setColour(juce::Colour{0xff24292c});
+        g.fillRoundedRectangle(thumb,3.0f);
+        g.setColour(juce::Colour{0xff5e6568});
+        g.drawRoundedRectangle(thumb.reduced(0.5f),2.5f,1.0f);
     }
-    // Draw a narrow light-catching ridge over the image. The centre marker
-    // must move with thumb at both extremes and at all supported widths.
-    const float ridgeX=thumb.getCentreX();
-    g.setColour(juce::Colour{0xffc8d0d2}.withAlpha(0.9f));
-    g.drawVerticalLine(juce::roundToInt(ridgeX),thumb.getY()+3.0f,
-                       thumb.getBottom()-3.0f);
-    g.setColour(juce::Colour{0xff5f6a70}.withAlpha(0.8f));
-    g.drawVerticalLine(juce::roundToInt(ridgeX+2.0f),
-                       thumb.getY()+4.0f,thumb.getBottom()-4.0f);
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
                                  bool highlighted,bool down) {

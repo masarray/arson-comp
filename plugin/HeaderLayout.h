@@ -20,7 +20,7 @@ struct EditorMetrics {
     static constexpr float headerCaptionFont=9.5f;
     static constexpr float buttonFont=11.0f;
     static constexpr float controlCaptionFont=10.4f;
-    static constexpr int knobCaptionOffset=2, knobTopOffset=26, knobHeight=58;
+    static constexpr int knobCaptionOffset=2, knobTopOffset=26, knobHeight=66;
     static constexpr int faderCaptionOffset=25, faderTopOffset=44, faderHeight=34;
     static constexpr juce::uint32 captionRgb=0xffd9e0e3;
     static constexpr juce::uint32 controlCaptionRgb=0xffe4e9ec;

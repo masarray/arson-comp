@@ -55,7 +55,7 @@ if(ARSON_BUILD_PLUGIN)
   juce_add_binary_data(ArSonCompKnobAssets
     SOURCES assets/black_brushed_knob.jpg
             assets/gunmetal_slider_track.png
-            assets/gunmetal_slider_thumb_red.png
+            assets/dark_brushed_slider_thumb.png
             assets/toggle/arson_toggle_on.png
             assets/toggle/arson_toggle_off.png
             assets/arsoncomp_header_logo.png)
