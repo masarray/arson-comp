@@ -16,7 +16,7 @@ private:
     struct FaceCache { int pixels=0; juce::Image face; };
     std::array<FaceCache,2> faces; // normal + oversized Threshold only
     juce::Image sourceFace; // decoded once on GUI initialization
-    juce::Image sliderThumb; // supplied PAN-SLIDER.png, decoded once
+    juce::Image sliderTrack, sliderThumb; // layered photographic gunmetal assets, decoded once
     const juce::Image& knobFace(int diameter,bool primary);
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {

@@ -68,3 +68,10 @@ Verify default 1120x760, minimum 960x670 and compact 380px Windows screenshot ge
 - Full 900x765 and minimum 860x700 screenshot: charcoal-brushed metal chassis with subtle horizontal micrograin; full transfer/dynamics LCD is black glass with thin specular border and black LED IN/GR/OUT wells. The body is not filled with expensive per-frame noise or visual DSP.
 - Secondary sliders: a dark, 26px-deep shadowed inset holds the same original 22px metal thumb. Captions for AUTO, EXT SC, LISTEN and ACTIVE/BYPASS sit to the left of each toggle switch; no overlays or clips in full, compact or sidechain layout.
 - All prior engine_contract and plugin_state_editor regressions remain required. Confirm Windows CI success and actual screenshots; physical host validation remains separate.
+
+## Hardware fader / LED acceptance (2026-10-31)
+
+- Visual: gunmetal plate **stays fixed** while a narrower upright gunmetal thumb rides horizontally ABOVE it. At minimum the horizontal slot is dark; as any slider moves right, a soft coral-red light grows in the slot from its left end to the thumb, with the red thumb slit still visible. At maximum the entire slot behind the thumb is illuminated. Neither glow nor handle should bleed onto the gray brushed-steel chassis outside the plate.
+- GUI 900×765, minimum 860×700, SIDECHAIN 860×700, MINI 900×380: Range/Hold/Mix/Link and HP/LP each render the same plate and moving thumb. No labels/tabs collide.
+- Smoke: independent transparent PNGs must decode via built-in BinaryData at 340×57 / 58×124; actual JUCE L&F slider raster at min/mid/max must show an increase of red channel at x=61 along the groove and measurable pixel-change where the thumb moves. Existing preset, automation, stereo+mono sidechain, host bypass, 32/64/128 samples, sanitizer and zero DSP added latency tests remain mandatory.
+- Host/device latency and Pro-C audio parity are NOT implied by visual CI.

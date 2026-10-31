@@ -170,15 +170,63 @@ int main(int argc,char** argv) {
         if(std::abs(audio.getSample(0,0)-0.123f)>1.0e-6f ||
            std::abs(audio.getSample(0,31)-0.123f)>1.0e-6f)return failHost(46);
     }
-    // Validate the supplied transparent PAN-SLIDER asset is embedded in
-    // JUCE BinaryData and will not require an external install path.
+    // Hardware fader layer contract: independent transparent photo plate
+    // (stationary), photo thumb (red aperture) and moving red LED level.
+    // Confirm real JUCE BinaryData resources, not external installation paths.
     {
-        const auto image=juce::ImageFileFormat::loadFrom(
-            BinaryData::sliderthumb_png,
-            static_cast<std::size_t>(BinaryData::sliderthumb_pngSize));
-        if(!image.isValid() || image.getWidth()!=18 || image.getHeight()!=40 ||
-           image.getPixelAt(0,0).getFloatAlpha()>0.01f ||
-           image.getPixelAt(9,20).getFloatAlpha()<0.9f) return 47;
+        const auto plate=juce::ImageFileFormat::loadFrom(
+            BinaryData::gunmetal_slider_track_png,
+            static_cast<std::size_t>(BinaryData::gunmetal_slider_track_pngSize));
+        const auto thumb=juce::ImageFileFormat::loadFrom(
+            BinaryData::gunmetal_slider_thumb_red_png,
+            static_cast<std::size_t>(BinaryData::gunmetal_slider_thumb_red_pngSize));
+        if(!plate.isValid() || plate.getWidth()!=340 || plate.getHeight()!=57 ||
+           !thumb.isValid() || thumb.getWidth()!=58 || thumb.getHeight()!=124 ||
+           plate.getPixelAt(0,0).getFloatAlpha()>0.04f ||
+           thumb.getPixelAt(0,0).getFloatAlpha()>0.04f ||
+           plate.getPixelAt(170,29).getFloatAlpha()<0.92f ||
+           thumb.getPixelAt(29,62).getFloatAlpha()<0.92f) return 47;
+
+        // Raster-render all three slider positions via the *production*
+        // LookAndFeel, then inspect the LED at a track location untouched
+        // by the thumb. Red must be off at minimum and lit at maximum.
+        CompLook look;
+        juce::Slider slider;
+        constexpr int w=160,h=40;
+        const auto render=[&](float position) {
+            juce::Image canvas(juce::Image::RGB,w,h,true);
+            {
+                juce::Graphics g(canvas);
+                g.fillAll(juce::Colour{0xff44494d});
+                look.drawLinearSlider(g,0,0,w,h,position,0.0f,0.0f,
+                                      juce::Slider::LinearHorizontal,slider);
+            }
+            return canvas;
+        };
+        const auto low=render(21.0f);
+        const auto mid=render(80.0f);
+        const auto high=render(139.0f);
+        const auto off=low.getPixelAt(61,20);
+        const auto on=high.getPixelAt(61,20);
+        if(on.getRed()<=off.getRed()+35 ||
+           on.getRed()<=on.getGreen()+24) {
+            std::cerr<<"GUNMETAL_LED_54 off="<<off.toDisplayString(true)
+                     <<" on="<<on.toDisplayString(true)<<'\n';
+            return 54;
+        }
+        // Photo thumb travels across the *same* stationary plate.
+        // The centre thumbnail area is metal at 50%, but at 100% is
+        // dark track; use contrast not a fragile exact RGB value.
+        float diff=0.0f;
+        for(int y=6;y<36;y+=4)
+            for(int x=74;x<=86;x+=4)
+                diff+=std::abs(mid.getPixelAt(x,y).getBrightness()-
+                               high.getPixelAt(x,y).getBrightness());
+        if(diff<0.25f) {
+            std::cerr<<"GUNMETAL_THUMB_TRAVEL_55 image difference="
+                     <<diff<<'\n';
+            return 55;
+        }
     }
     // Cached chassis must be genuinely brushed grey, while the LCD
     // must remain deep black. Probe actual JUCE image rasterization after

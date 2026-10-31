@@ -39,10 +39,15 @@ CompLook::CompLook() {
         BinaryData::black_brushed_knob_jpg,
         static_cast<std::size_t>(BinaryData::black_brushed_knob_jpgSize));
     jassert(sourceFace.isValid());
+    // Two light-weight, transparent gunmetal assets are decoded once,
+    // exclusively on the GUI thread; no file I/O or decoding in paint().
+    sliderTrack=juce::ImageFileFormat::loadFrom(
+        BinaryData::gunmetal_slider_track_png,
+        static_cast<std::size_t>(BinaryData::gunmetal_slider_track_pngSize));
     sliderThumb=juce::ImageFileFormat::loadFrom(
-        BinaryData::sliderthumb_png,
-        static_cast<std::size_t>(BinaryData::sliderthumb_pngSize));
-    jassert(sliderThumb.isValid());
+        BinaryData::gunmetal_slider_thumb_red_png,
+        static_cast<std::size_t>(BinaryData::gunmetal_slider_thumb_red_pngSize));
+    jassert(sliderTrack.isValid() && sliderThumb.isValid());
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colour{0xff31383e});
@@ -133,41 +138,62 @@ void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
 void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float,float,
                                  const juce::Slider::SliderStyle,juce::Slider&) {
-    const float left=static_cast<float>(x)+10.0f;
-    const float right=static_cast<float>(x+w)-10.0f;
-    const float cy=static_cast<float>(y)+h*0.50f;
-    const float end=juce::jlimit(left,right,pos);
-    // A full thumb-height recessed channel. Small shadow and opposing edge
-    // highlights establish physical depth without any per-frame blur.
-    const juce::Rectangle<float> well{left-7.0f,cy-13.0f,
-                                     right-left+14.0f,26.0f};
-    g.setColour(juce::Colours::black.withAlpha(0.30f));
-    g.fillRoundedRectangle(well.translated(0.0f,1.4f),8.0f);
-    g.setColour(juce::Colour{0xff15191c});
-    g.fillRoundedRectangle(well,8.0f);
-    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff080b0d},
-        well.getX(),well.getY(),juce::Colour{0xff292e32},
-        well.getX(),well.getBottom(),false));
-    g.fillRoundedRectangle(well.reduced(2.0f),6.0f);
-    g.setColour(juce::Colours::black.withAlpha(0.66f));
-    g.drawLine(well.getX()+5.0f,well.getY()+2.1f,
-               well.getRight()-5.0f,well.getY()+2.1f,1.4f);
-    g.setColour(juce::Colours::white.withAlpha(0.15f));
-    g.drawLine(well.getX()+6.0f,well.getBottom()-2.2f,
-               well.getRight()-6.0f,well.getBottom()-2.2f,0.8f);
-    g.setColour(juce::Colour{0xff333a40});
-    g.fillRoundedRectangle(left,cy-2.1f,right-left,4.2f,2.1f);
-    g.setColour(accent.withAlpha(0.94f));
-    if(end-left>1.0f)
-        g.fillRoundedRectangle(left,cy-2.1f,end-left,4.2f,2.1f);
-    // Original PAN-SLIDER resource, resized only by lightweight drawImage.
+    const float cy=static_cast<float>(y)+static_cast<float>(h)*0.50f;
+    const float plateX=static_cast<float>(x)+2.0f;
+    const float plateW=static_cast<float>(w)-4.0f;
+    constexpr float plateH=30.0f;
+    // Photo plate is stationary. Nine-slice horizontally (3 segments)
+    // preserves realistic endcaps at both the short and 170px SC sliders.
+    if(sliderTrack.isValid()) {
+        constexpr float srcCap=37.0f, dstCap=18.0f;
+        const float srcW=static_cast<float>(sliderTrack.getWidth());
+        const float srcH=static_cast<float>(sliderTrack.getHeight());
+        const float top=cy-plateH*0.5f;
+        const float midW=juce::jmax(0.0f,plateW-2.0f*dstCap);
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImage(sliderTrack,
+            juce::Rectangle<float>{plateX,top,dstCap,plateH},
+            juce::Rectangle<float>{0.0f,0.0f,srcCap,srcH});
+        g.drawImage(sliderTrack,
+            juce::Rectangle<float>{plateX+dstCap,top,midW,plateH},
+            juce::Rectangle<float>{srcCap,0.0f,srcW-2.0f*srcCap,srcH});
+        g.drawImage(sliderTrack,
+            juce::Rectangle<float>{plateX+plateW-dstCap,top,dstCap,plateH},
+            juce::Rectangle<float>{srcW-srcCap,0.0f,srcCap,srcH});
+    } else {
+        g.setColour(juce::Colour{0xff282d31});
+        g.fillRoundedRectangle(plateX,cy-14.0f,plateW,28.0f,7.0f);
+    }
+
+    // Use the same travel limits for the bright level and moving thumb.
+    // The LED is INSIDE the dark photo slot, not a red slider drawn
+    // over the brushed metal. At minimum it is genuinely extinguished.
+    const float left=static_cast<float>(x)+21.0f;
+    const float right=static_cast<float>(x+w)-21.0f;
+    const float cx=juce::jlimit(left,right,pos);
+    if(cx>left+0.3f) {
+        juce::Graphics::ScopedSaveState scope(g);
+        juce::Path slot;
+        slot.addRoundedRectangle(left,cy-4.0f,right-left,8.0f,3.2f);
+        g.reduceClipRegion(slot);
+        g.setColour(juce::Colour{0xff922731}.withAlpha(0.40f));
+        g.fillRoundedRectangle(left,cy-4.0f,cx-left,8.0f,3.5f);
+        g.setGradientFill(juce::ColourGradient(
+            juce::Colour{0xffff6774}.withAlpha(0.98f),left,cy-2.6f,
+            juce::Colour{0xffa62038}.withAlpha(0.90f),left,cy+3.5f,false));
+        g.fillRoundedRectangle(left,cy-2.8f,cx-left,5.6f,2.8f);
+        g.setColour(juce::Colour{0xffff9197}.withAlpha(0.55f));
+        g.fillRect(left,cy-0.7f,cx-left,1.4f);
+    }
+    // The thumb is the FRONT layer. Only its x position moves with the
+    // JUCE slider value; the chassis, glass and audio thread never move.
     if(sliderThumb.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
         g.drawImage(sliderThumb,
-            juce::Rectangle<float>{end-5.5f,cy-11.0f,11.0f,22.0f});
+            juce::Rectangle<float>{cx-9.0f,cy-18.5f,18.0f,37.0f});
     } else {
-        g.setColour(juce::Colour{0xffb4b7b9});
-        g.fillRoundedRectangle(end-4.0f,cy-10.0f,8.0f,20.0f,2.0f);
+        g.setColour(juce::Colour{0xffa8afb1});
+        g.fillRoundedRectangle(cx-8.0f,cy-17.0f,16.0f,34.0f,4.0f);
     }
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,

@@ -47,7 +47,9 @@ if(ARSON_BUILD_PLUGIN)
   # Bundled reference-derived black brushed-metal image. Generated assets
   # are compiled into the VST3/Standalone; no filesystem access at runtime.
   juce_add_binary_data(ArSonCompKnobAssets
-    SOURCES assets/black_brushed_knob.jpg assets/sliderthumb.png)
+    SOURCES assets/black_brushed_knob.jpg
+            assets/gunmetal_slider_track.png
+            assets/gunmetal_slider_thumb_red.png)
   target_sources(ArSonComp PRIVATE plugin/Processor.cpp plugin/Editor.cpp)
   if(MSVC)
     target_compile_options(ArSonComp PRIVATE /utf-8)
