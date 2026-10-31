@@ -21,3 +21,11 @@ Current results must be recorded from the CI run for the commit which introduces
 ## Integrated-graph reference milestone (pending CI)
 
 Verify default 1120x760, minimum 960x670 and compact 380px Windows screenshot geometry; confirm accurate dark/red gradients, animated reduction/input/output history on a single canvas, red curved transfer law, dominant Threshold knob, stereo IN L/R and OUT L/R LED meters and GR meter. Engine checks 0.2/0.65 independent stereo input/output peaks and preserved aggregate maximum. Preset smoke must pass after correcting public static AudioProcessor XML helpers. No false lookahead knob, no added DSP samples. Host validation and DPI scaling remain release gates; screenshot smoke alone does not prove sonic parity.
+
+## Focused GUI milestone — acceptance
+
+- Assert 900×765 default, 860×700 minimum, 380px MINI and FULL roundtrip in Windows VST3 editor smoke.
+- Check no collision / no off-window bounds for model+preset+SAVE+OPEN, 7 main controls, 6 secondary controls and detector/AUTO/EXT SC/LISTEN group; verify labels and tooltip visual design.
+- Screenshot visual review: graph aspect and central prominence, legible 6 dB grid, restrained coral dissolving fill, stereo LED meters, large Threshold, full/mini readability.
+- UI 30 Hz timing and 100 Hz bounded queue; time-based meter easing only on GUI; fixed ring history paths reused across paints and recomputed only for new telemetry or resize. Confirm on host with audio that motion is smoother without extra DSP latency.
+- No engine code changed on this milestone; zero added sample contract preserved. Benchmark multiple editors/instances and measure CPU only from real device when available. pluginval / 150% DPI still pending.

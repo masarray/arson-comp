@@ -15,3 +15,7 @@ Keep builds grouped: one relevant-PR workflow with Linux safety and one Windows 
 ## Current priority: reference visual fidelity + previous build regression
 
 The supplied red ArSonComp mockup is now the acceptance layout for a full-width integrated transfer/compression graph, side LED meters with true stereo peaks, animated actual GR, red dissolving fill, dominant Threshold knob, and two-row compact controls. Preserve no-lookahead live mode. IMPORTANT: CI for f847fa6 failed because PresetIO.h incorrectly called juce namespace functions getXmlFromBinary/copyXmlToBinary. Correct public API is juce::AudioProcessor::getXmlFromBinary/copyXmlToBinary. Validate Windows compile and the three screenshot variants before claiming milestone completed. Keep one grouped commit/CI and retain Draft until real verification.
+
+## Focused-layout milestone handoff
+
+The full reference GUI in commit f63e8c6 passed Windows/Linux CI, but user feedback on actual screenshot showed it was too wide and secondary controls were crowded. The new grouped follow-up moves to 900x765 default (860x700 minimum), shortens secondary labels with tooltip help, reflows all header/buttons/slider regions and adds smoke collision bounds tests. It also caches 400-point signal/GR Path objects between actual telemetry updates and applies UI-only time-based meter easing. Do not move easing onto the audio callback or add Lookahead. Review default/minimum/MINI Windows screenshots before release; host/pluginval/real device tests remain outstanding.

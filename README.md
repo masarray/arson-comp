@@ -62,3 +62,9 @@ Repository license remains AGPL-3.0. JUCE has its own AGPL/commercial terms; see
 ## GUI visual reference and acceptance
 
 The newly redesigned UI uses the user-supplied ArSonComp mockup as a layout acceptance target: integrated upper graph, side meters, red glow and premium hardware controls. No bitmap UI assets, lookahead, worker waits or added algorithmic sample delay. The static graph background builds only on resize and the transfer curve is cached until threshold/ratio/knee/range or width changes. Windows test screenshots must show default 1120x760, minimum 960x670 and MINI 380px. A prior Windows CI build of the portable-preset milestone failed to compile due to incorrectly qualified JUCE XML helper methods; the new milestone fixes these to public AudioProcessor static methods.
+
+## Focused GUI and no-overdraw rendering milestone
+
+The 900x765 default layout replaces the earlier 1120x760 wide editor. Minimum 860x700; the optional 380px MINI/FULL mode retains all audio controls. Header, secondary sliders and toggles now use fixed-reserved regions and short labels such as HP/LP/LINK/EXT SC, with detailed dark contextual tooltips. The full graph is closer to square and remains the hero element. JUCE paint maintains a muted graphite/coral palette with a single enlarged Threshold.
+
+The GUI timer coalesces 100 Hz telemetry at 30 Hz and applies time-normalized attack/release easing only to the **display**, not audio. Input/output and actual GR history use a persistent fixed 400-frame ring buffer, with Path objects rebuilt only on new telemetry or layout change; any UI repaint simply strokes cached paths. Static grid remains cached per resize and transfer curve geometry only rebuilds when its parameters/size change. No new DSP latency, audio-thread worker, lock, heap use or lookahead.

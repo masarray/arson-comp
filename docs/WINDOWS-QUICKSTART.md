@@ -32,3 +32,7 @@ FabFilter Pro-C is an independent benchmark for workflow/quality only. No FabFil
 ### New full-graph GUI acceptance
 
 Check upper central transfer graph, red fading curve and live gain reduction line, left input stereo LED meters, right GR and output stereo LEDs, and enlarged Threshold knob. Check the default/minimum/MINI screenshots from this commit, not a previous ZIP. No lookahead is present in the zero-added-sample live signal path.
+
+### Focused GUI revision
+
+The current test build opens at 900×765 instead of 1120×760. Minimum resizable size is 860×700; MINI is 380px high, and FULL restores the previous expanded dimensions. Check that all header elements fit, HP/LP and detector AUTO/EXT SC/LISTEN do not collide, and that long explanations appear in tooltips. With a running signal, verify smooth meter/GR motion against the exact audio; smoothing is UI only, with zero extra DSP samples.

@@ -4,13 +4,20 @@
 #include <algorithm>
 
 namespace {
-const juce::Colour bg{0xff0c0f11}, top{0xff171b20}, panel{0xff101317},
-    line{0xff30353a}, text{0xffe5e8eb}, muted{0xffa2a8ae},
-    accent{0xfffa4a58}, accentBright{0xffff6870}, green{0xff70e593},
-    yellow{0xffffd661};
+const juce::Colour bg{0xff101315}, panel{0xff14191c},
+    line{0xff343c41}, text{0xffe3e6e5}, muted{0xff9ea6a7},
+    accent{0xffdf5860}, accentBright{0xfff4797d}, green{0xff83cfa1},
+    yellow{0xffe9c978};
 
 float clamp01(float x) noexcept { return juce::jlimit(0.0f,1.0f,x); }
 float dbFraction(float x) noexcept { return clamp01((x+60.0f)/60.0f); }
+// Visual ballistics only: no effect on detector, gain or audio latency.
+float approachVisual(float current,float target,double elapsedSeconds,
+                     double riseSeconds,double fallSeconds) noexcept {
+    const double tau=target>current ? riseSeconds : fallSeconds;
+    const float alpha=static_cast<float>(1.0-std::exp(-elapsedSeconds/tau));
+    return current+alpha*(target-current);
+}
 float graphY(const juce::Rectangle<float>& p,float db) noexcept {
     return p.getBottom()-dbFraction(db)*p.getHeight();
 }
@@ -124,6 +131,22 @@ void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
         button.getHeight(),juce::Justification::centredLeft);
 }
 
+void CompLook::drawTooltip(juce::Graphics& g,const juce::String& value,int w,int h) {
+    const auto r=juce::Rectangle<float>(1.0f,1.0f,static_cast<float>(w-2),static_cast<float>(h-2));
+    g.setColour(juce::Colours::black.withAlpha(0.22f));
+    g.fillRoundedRectangle(r.translated(0.0f,1.0f),6.0f);
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff283037},0,0,
+         juce::Colour{0xff15191d},static_cast<float>(w),static_cast<float>(h),false));
+    g.fillRoundedRectangle(r,6.0f);
+    g.setColour(juce::Colour{0xff5b6267});
+    g.drawRoundedRectangle(r,6.0f,0.8f);
+    g.setColour(accent.withAlpha(0.78f));
+    g.fillRoundedRectangle(7.0f,8.0f,2.0f,static_cast<float>(std::max(4,h-16)),1.0f);
+    g.setColour(text);
+    g.setFont(juce::FontOptions(12.0f));
+    g.drawFittedText(value,15,5,w-24,h-10,juce::Justification::centredLeft,3);
+}
+
 Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.snapshot()) {
     setLookAndFeel(&look);
     setOpaque(true);
@@ -143,7 +166,12 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         k.setName(spec.name);
         k.setComponentID("param."+juce::String(spec.id));
         k.setTooltip(juce::String(spec.name)+": drag to change; double click resets; type exact values.");
-        labels[i].setText(juce::String(spec.name).toUpperCase(),juce::dontSendNotification);
+        juce::String shortLabel=juce::String(spec.name).toUpperCase();
+        if(i==arson::Highpass) shortLabel="HP";
+        if(i==arson::Lowpass) shortLabel="LP";
+        if(i==arson::Link) shortLabel="LINK";
+        labels[i].setText(shortLabel,juce::dontSendNotification);
+        labels[i].setTooltip(juce::String(spec.name)+": adjust the compressor's "+spec.name);
         labels[i].setFont(juce::FontOptions(11.0f));
         labels[i].setJustificationType(juce::Justification::centred);
         addAndMakeVisible(labels[i]);
@@ -151,16 +179,19 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         attachments[i]=std::make_unique<SliderAttachment>(p.state,spec.id,k);
     }
     style.addItemList({"Clean - feedforward","Feedback - classic","Smooth - dual envelope"},1);
+    style.setComponentID("view.model");
     style.setTooltip("Three independent zero-added-sample-latency compressor models.");
     addAndMakeVisible(style);
     styleAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         p.state,"style",style);
     presets.addItemList({"Default","Vocal | gentle","Vocal | level",
         "Mix bus | glue","Drums | punch","Podcast | steady"},1);
+    presets.setComponentID("view.presets");
     presets.setTooltip("Choose a factory starting point; threshold depends on input level.");
     presets.onChange=[this] {applyPreset(presets.getSelectedId());};
     addAndMakeVisible(presets);
     detector.addItemList({"Peak","RMS"},1);
+    detector.setComponentID("view.detector");
     detector.setTooltip("Peak: transients; RMS: smoothed 10 ms energy, with zero lookahead.");
     addAndMakeVisible(detector);
     detectorAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
@@ -171,8 +202,15 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         addAndMakeVisible(*toggles[i]);
         buttons[i]=std::make_unique<ButtonAttachment>(p.state,toggleIds[i],*toggles[i]);
     }
-    external.setTooltip("Requires the host to route the external sidechain.");
-    listen.setTooltip("Audition the detector: turn off after checking.");
+    autoRelease.setComponentID("view.auto");
+    external.setComponentID("view.external");
+    listen.setComponentID("view.listen");
+    autoRelease.setButtonText("AUTO");
+    external.setButtonText("EXT SC");
+    listen.setButtonText("LISTEN");
+    autoRelease.setTooltip("Auto Release - adapts recovery time to signal activity.");
+    external.setTooltip("External Sidechain - routes the host's auxiliary detector bus.");
+    listen.setTooltip("Listen Sidechain - audition the filtered detector signal.");
     compare.setTooltip("A/B snapshots apply to actual host parameters.");
     compare.onClick=[this] {
         const auto current=processor.snapshot();
@@ -242,11 +280,11 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         compactMode=!compactMode;
         if(compactMode) {
             expandedWidth=getWidth();expandedHeight=getHeight();
-            setResizeLimits(960,380,1600,380);
+            setResizeLimits(860,380,1200,380);
             compact.setButtonText("FULL");
             setSize(expandedWidth,380);
         } else {
-            setResizeLimits(960,670,1600,1040);
+            setResizeLimits(860,700,1200,965);
             compact.setButtonText("MINI");
             setSize(expandedWidth,expandedHeight);
         }
@@ -257,8 +295,8 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     presets.setSelectedId(0,juce::dontSendNotification);
     presets.setText("Custom / restored",juce::dontSendNotification);
     setResizable(true,true);
-    setResizeLimits(960,670,1600,1040);
-    setSize(1120,760);
+    setResizeLimits(860,700,1200,965);
+    setSize(900,765);
     startTimerHz(30);
 }
 Editor::~Editor() {
@@ -306,72 +344,78 @@ juce::Rectangle<float> Editor::plotBounds() const noexcept {
 }
 void Editor::resized() {
     const int w=getWidth(),h=getHeight();
-    compact.setBounds(194,31,52,28);
-    style.setBounds(257,30,177,29);
-    presets.setBounds(w-472,30,160,29);
-    savePreset.setBounds(w-304,30,50,29);
-    loadPreset.setBounds(w-248,30,50,29);
-    compare.setBounds(w-192,30,67,29);
-    bypass.setBounds(w-116,32,101,26);
-    display=compactMode?juce::Rectangle<int>{}:juce::Rectangle<int>{9,83,w-18,h-366};
-    const int mainY=compactMode?71:display.getBottom()+7;
+    // Narrow portrait-weight layout: fixed utility budget + elastic control cells.
+    // No label or toggle is allowed to overlap its neighbor at minimum size.
+    compact.setBounds(166,23,47,28);
+    style.setBounds(220,22,146,29);
+    presets.setBounds(w-467,22,151,29);
+    savePreset.setBounds(w-308,22,47,29);
+    loadPreset.setBounds(w-257,22,47,29);
+    compare.setBounds(w-206,22,64,29);
+    bypass.setBounds(w-135,23,122,27);
+    display=compactMode?juce::Rectangle<int>{}:
+        juce::Rectangle<int>{8,73,w-16,h-333};
+    const int mainY=compactMode?68:display.getBottom()+8;
     const int cell=(w-28)/7;
-    const std::array<std::size_t,7> main{arson::Input,arson::Attack,
+    constexpr std::array<std::size_t,7> main{arson::Input,arson::Attack,
         arson::Release,arson::Threshold,arson::Ratio,arson::Knee,arson::Makeup};
     for(std::size_t k=0;k<main.size();++k) {
-        const auto i=main[k]; const int x=14+static_cast<int>(k)*cell;
-        labels[i].setBounds(x,mainY+5,cell,17);
-        knobs[i].setBounds(x+4,mainY+20,cell-8,114);
+        const auto i=main[k];const int x=14+static_cast<int>(k)*cell;
+        labels[i].setBounds(x,mainY+3,cell,17);
+        knobs[i].setBounds(x+3,mainY+20,cell-6,105);
     }
-    const int bottomY=compactMode?203:h-126;
-    const int small=(w-218)/6;
-    const std::array<std::size_t,6> smallControls{arson::Range,arson::Hold,
+    const int bottomY=compactMode?202:h-119;
+    const int small=(w-245)/6;
+    constexpr std::array<std::size_t,6> secondary{arson::Range,arson::Hold,
         arson::Mix,arson::Link,arson::Highpass,arson::Lowpass};
-    for(std::size_t k=0;k<smallControls.size();++k) {
-        const auto i=smallControls[k]; const int x=14+static_cast<int>(k)*small;
-        labels[i].setBounds(x,bottomY+4,small,17);
-        knobs[i].setBounds(x+5,bottomY+23,small-10,61);
+    for(std::size_t k=0;k<secondary.size();++k) {
+        const auto i=secondary[k];const int x=14+static_cast<int>(k)*small;
+        labels[i].setBounds(x,bottomY+1,small,16);
+        knobs[i].setBounds(x+6,bottomY+18,small-12,55);
     }
-    const int opts=w-204;
-    detector.setBounds(opts,bottomY+6,91,27);
-    autoRelease.setBounds(opts+99,bottomY+5,109,27);
-    external.setBounds(opts,bottomY+42,105,26);
-    listen.setBounds(opts+107,bottomY+42,104,26);
+    const int opts=w-220;
+    detector.setBounds(opts,bottomY+1,84,26);
+    autoRelease.setBounds(opts+90,bottomY+1,112,26);
+    external.setBounds(opts,bottomY+37,94,24);
+    listen.setBounds(opts+102,bottomY+37,100,24);
     if(compactMode){grid=juce::Image();return;}
 
-    // The graph background never depends on audio. Build it on layout changes only.
+    // This cache owns only immutable decoration. Animated history paths are
+    // separate message-thread caches rebuilt on new telemetry, not paint().
     cachedCurveWidth=-1;
     grid=juce::Image(juce::Image::RGB,display.getWidth(),display.getHeight(),true);
     juce::Graphics g(grid);
-    const float width=static_cast<float>(display.getWidth()),height=static_cast<float>(display.getHeight());
+    const float width=static_cast<float>(display.getWidth());
+    const float height=static_cast<float>(display.getHeight());
     g.setGradientFill(juce::ColourGradient(panel,0.0f,0.0f,bg,width,height,false));
     g.fillAll();
     const auto plot=plotBounds().translated(-static_cast<float>(display.getX()),
                                             -static_cast<float>(display.getY()));
-    g.setColour(juce::Colour{0xff20262b}.withAlpha(0.43f));
+    g.setColour(juce::Colour{0xff20262b}.withAlpha(0.34f));
     g.fillRect(plot);
     const float bottom=plot.getBottom(),left=plot.getX(),right=plot.getRight();
     for(int db=-60;db<=0;db+=6) {
         const float yy=graphY(plot,static_cast<float>(db));
-        g.setColour(juce::Colour{0xff58616a}.withAlpha(db%12==0?0.24f:0.1f));
+        g.setColour(juce::Colour{0xff58616a}.withAlpha(db%12==0?0.18f:0.07f));
         g.drawHorizontalLine(static_cast<int>(yy),left,right);
         if(db%12==0) {
-            g.setColour(muted.withAlpha(0.72f));
-            g.setFont(juce::FontOptions(10.0f));
+            g.setColour(muted.withAlpha(0.62f));
+            g.setFont(juce::FontOptions(9.0f));
             g.drawText(juce::String(db),static_cast<int>(left)-37,
                 static_cast<int>(yy)-8,31,17,juce::Justification::centredRight);
         }
     }
     for(int db=-60;db<=0;db+=10) {
         const float xx=left+(static_cast<float>(db+60)/60.0f)*plot.getWidth();
-        g.setColour(juce::Colour{0xff64707a}.withAlpha(db%20==0?0.24f:0.11f));
+        g.setColour(juce::Colour{0xff64707a}.withAlpha(db%20==0?0.18f:0.08f));
         g.drawVerticalLine(static_cast<int>(xx),plot.getY(),bottom);
     }
-    g.setColour(juce::Colour{0xff51585f}.withAlpha(0.7f));
-    g.drawRect(plot,0.9f);
-    g.setColour(juce::Colour{0xff454b50});
+    g.setColour(juce::Colour{0xff51585f}.withAlpha(0.52f));
+    g.drawRect(plot,0.8f);
+    g.setColour(juce::Colour{0xff454b50}.withAlpha(0.75f));
     g.drawVerticalLine(static_cast<int>(left)-45,18.0f,height-20.0f);
     g.drawVerticalLine(static_cast<int>(right)+12,18.0f,height-20.0f);
+    rebuildHistoryPaths();
 }
 void Editor::timerCallback() {
     if(!isShowing())return;
@@ -385,9 +429,11 @@ void Editor::timerCallback() {
                 break;
             }
     }
-    arson::MeterFrame frame; float in=0,out=0,reduction=0;
+    arson::MeterFrame frame;
+    float in=0,out=0,reduction=0;
     std::array<float,2> inPeaks{},outPeaks{};
     int received=0;
+    // Coalesce the bounded SPSC queue exactly once per GUI tick.
     while(received<static_cast<int>(arson::MeterQueue::capacity) &&
           processor.meters.pop(frame)) {
         history[head]=frame;
@@ -397,63 +443,115 @@ void Editor::timerCallback() {
         out=std::max(out,frame.output);
         reduction=std::max(reduction,frame.reduction);
         currentChannels=frame.channels;
-        for(int i=0;i<2;++i) {
-            inPeaks[static_cast<std::size_t>(i)]=std::max(inPeaks[static_cast<std::size_t>(i)],
-                frame.inputChannel[static_cast<std::size_t>(i)]);
-            outPeaks[static_cast<std::size_t>(i)]=std::max(outPeaks[static_cast<std::size_t>(i)],
-                frame.outputChannel[static_cast<std::size_t>(i)]);
+        for(std::size_t i=0;i<2;++i) {
+            inPeaks[i]=std::max(inPeaks[i],frame.inputChannel[i]);
+            outPeaks[i]=std::max(outPeaks[i],frame.outputChannel[i]);
         }
     }
-    inputDb=std::max(arson::gainToDb(in),inputDb-1.2f);
-    outputDb=std::max(arson::gainToDb(out),outputDb-1.2f);
-    gr=std::max(reduction,gr-0.8f);
-    for(int i=0;i<2;++i) {
-        inChannelDb[static_cast<std::size_t>(i)]=
-            std::max(arson::gainToDb(inPeaks[static_cast<std::size_t>(i)]),
-                inChannelDb[static_cast<std::size_t>(i)]-1.2f);
-        outChannelDb[static_cast<std::size_t>(i)]=
-            std::max(arson::gainToDb(outPeaks[static_cast<std::size_t>(i)]),
-                outChannelDb[static_cast<std::size_t>(i)]-1.2f);
+    // Time-based visual smoothing: attack remains responsive (~18 ms) while
+    // falloff is calm (~210 ms). No change to real detector or DSP latency.
+    const double now=juce::Time::getMillisecondCounterHiRes();
+    const double elapsed=lastUiTickMs>0.0 ?
+        std::clamp((now-lastUiTickMs)*0.001,0.008,0.120):1.0/30.0;
+    lastUiTickMs=now;
+    inputDb=approachVisual(inputDb,arson::gainToDb(in),elapsed,0.018,0.210);
+    outputDb=approachVisual(outputDb,arson::gainToDb(out),elapsed,0.018,0.210);
+    gr=approachVisual(gr,reduction,elapsed,0.022,0.185);
+    for(std::size_t i=0;i<2;++i) {
+        inChannelDb[i]=approachVisual(inChannelDb[i],
+            arson::gainToDb(inPeaks[i]),elapsed,0.018,0.210);
+        outChannelDb[i]=approachVisual(outChannelDb[i],
+            arson::gainToDb(outPeaks[i]),elapsed,0.018,0.210);
     }
+    if(!compactMode && received>0)rebuildHistoryPaths();
     if(compactMode)repaint(14,298,getWidth()-28,57);
     else repaint(display);
 }
+
+void Editor::rebuildHistoryPaths() {
+    inputHistory.clear();
+    outputHistory.clear();
+    reductionHistory.clear();
+    reductionArea.clear();
+    const auto plot=plotBounds().translated(-static_cast<float>(display.getX()),
+                                            -static_cast<float>(display.getY()));
+    if(plot.isEmpty())return;
+    float inY=plot.getBottom(),outY=plot.getBottom(),grY=plot.getY();
+    constexpr float inputEase=0.52f, outputEase=0.52f, grEase=0.42f;
+    for(std::size_t i=0;i<history.size();++i) {
+        const auto& f=history[(head+i)%history.size()];
+        const float x=plot.getX()+plot.getWidth()*static_cast<float>(i)/
+            static_cast<float>(history.size()-1);
+        const float targetIn=graphY(plot,arson::gainToDb(f.input));
+        const float targetOut=graphY(plot,arson::gainToDb(f.output));
+        const float targetGr=plot.getY()+clamp01(f.reduction/30.0f)*plot.getHeight()*0.40f;
+        if(i==0){inY=targetIn;outY=targetOut;grY=targetGr;}
+        else {
+            inY+=(targetIn-inY)*inputEase;
+            outY+=(targetOut-outY)*outputEase;
+            grY+=(targetGr-grY)*grEase;
+        }
+        if(i==0) {
+            inputHistory.startNewSubPath(x,inY);
+            outputHistory.startNewSubPath(x,outY);
+            reductionHistory.startNewSubPath(x,grY);
+            reductionArea.startNewSubPath(x,plot.getY());
+            reductionArea.lineTo(x,grY);
+        } else {
+            inputHistory.lineTo(x,inY);
+            outputHistory.lineTo(x,outY);
+            reductionHistory.lineTo(x,grY);
+            reductionArea.lineTo(x,grY);
+        }
+    }
+    reductionArea.lineTo(plot.getRight(),plot.getY());
+    reductionArea.closeSubPath();
+}
 void Editor::paint(juce::Graphics& g) {
     g.fillAll(bg);
-    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff272b30},0,0,bg,0,77,false));
-    g.fillRect(0,0,getWidth(),76);
-    g.setColour(juce::Colour{0xff41464b});
-    g.drawHorizontalLine(76,0.0f,static_cast<float>(getWidth()));
-    g.setFont(juce::FontOptions(24.0f));
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff202528},
+        0.0f,0.0f,bg,0.0f,69.0f,false));
+    g.fillRect(0,0,getWidth(),68);
+    g.setColour(line.withAlpha(0.67f));
+    g.drawHorizontalLine(68,0.0f,static_cast<float>(getWidth()));
+    g.setFont(juce::FontOptions(20.5f));
     g.setColour(text);
-    g.drawText("ArSon",18,16,93,28,juce::Justification::centredLeft);
+    g.drawText("ArSon",16,11,81,29,juce::Justification::centredLeft);
     g.setColour(accent);
-    g.drawText("Comp",111,16,87,28,juce::Justification::centredLeft);
-    g.fillRoundedRectangle(19.0f,57.0f,48.0f,2.5f,1.2f);
-    g.setColour(muted);g.setFont(juce::FontOptions(9.5f));
-    g.drawText("LIVE DYNAMICS",77,53,121,17,juce::Justification::centredLeft);
-    g.drawText("MODEL",258,11,100,17,juce::Justification::left);
-    g.drawText("PRESET",getWidth()-472,11,130,17,juce::Justification::left);
-    const int mainY=compactMode?71:display.getBottom()+7;
-    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff1c2025},
-        0,static_cast<float>(mainY),bg,0,static_cast<float>(mainY+170),false));
-    g.fillRect(8,mainY,getWidth()-16,compactMode?133:140);
-    g.setColour(line.withAlpha(0.80f));
+    g.drawText("Comp",89,11,71,29,juce::Justification::centredLeft);
+    g.fillRoundedRectangle(16.0f,49.0f,42.0f,2.0f,1.0f);
+    g.setColour(muted.withAlpha(0.86f));
+    g.setFont(juce::FontOptions(8.7f));
+    g.drawText("LIVE DYNAMICS",67,46,99,16,juce::Justification::centredLeft);
+    g.drawText("MODEL",221,5,90,16,juce::Justification::left);
+    g.drawText("PRESET",getWidth()-466,5,140,16,juce::Justification::left);
+    const int mainY=compactMode?68:display.getBottom()+8;
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff1b2023},
+        0.0f,static_cast<float>(mainY),bg,0.0f,static_cast<float>(mainY+141),false));
+    g.fillRect(8,mainY,getWidth()-16,132);
+    g.setColour(line.withAlpha(0.58f));
     g.drawHorizontalLine(mainY,12.0f,static_cast<float>(getWidth()-12));
-    g.drawHorizontalLine(compactMode?197:getHeight()-126,
+    g.drawHorizontalLine(compactMode?198:getHeight()-123,
         12.0f,static_cast<float>(getWidth()-12));
+    const int cell=(getWidth()-28)/7;
+    for(int i=1;i<7;++i) {
+        const float x=14.0f+static_cast<float>(i*cell);
+        g.setColour(line.withAlpha(0.16f));
+        g.drawVerticalLine(static_cast<int>(x),static_cast<float>(mainY+16),
+            static_cast<float>(mainY+117));
+    }
     if(!compactMode) {
         if(grid.isValid())g.drawImageAt(grid,display.getX(),display.getY());
-        g.setColour(juce::Colour{0xff50565c});
-        g.drawRoundedRectangle(display.toFloat(),5.0f,0.85f);
+        g.setColour(juce::Colour{0xff555d60}.withAlpha(0.62f));
+        g.drawRoundedRectangle(display.toFloat(),5.0f,0.8f);
         drawDisplay(g);
     } else paintCompactMeters(g);
-    g.setColour(muted.withAlpha(0.75f));
-    g.setFont(juce::FontOptions(9.3f));
-    g.drawText("ZERO ADDED SAMPLES   /   ZERO LOOKAHEAD   /   VST3",
-        16,getHeight()-18,438,14,juce::Justification::left);
-    g.drawText("Original real-time compressor  |  Drag controls  /  double-click reset",
-        getWidth()-435,getHeight()-18,420,14,juce::Justification::centredRight);
+    g.setColour(muted.withAlpha(0.67f));
+    g.setFont(juce::FontOptions(9.0f));
+    g.drawText("0 SAMPLES ADDED   /   VST3",14,getHeight()-19,250,15,
+        juce::Justification::left);
+    g.drawText("Drag / double-click reset / type exact values",
+        getWidth()-313,getHeight()-19,299,15,juce::Justification::centredRight);
 }
 void Editor::refreshTransfer(const arson::Parameters& p,juce::Rectangle<float> plot) {
     const std::array<float,4> key{{p[arson::Threshold],p[arson::Ratio],
@@ -537,11 +635,11 @@ void Editor::drawDisplay(juce::Graphics& g) {
     // real response curve; the animated lines are real per-block telemetry.
     // The two data types never claim to share an x-axis: static transfer uses
     // input level on x, dynamic history uses time.
-    g.setGradientFill(juce::ColourGradient(accent.withAlpha(0.23f),
+    g.setGradientFill(juce::ColourGradient(accent.withAlpha(0.14f),
         plot.getX(),plot.getY()+plot.getHeight()*0.28f,
-        accent.withAlpha(0.006f),plot.getX(),plot.getBottom(),false));
+        accent.withAlpha(0.005f),plot.getX(),plot.getBottom(),false));
     g.fillPath(transferShade);
-    g.setColour(accent.withAlpha(0.17f));
+    g.setColour(accent.withAlpha(0.12f));
     g.strokePath(transferCurve,juce::PathStrokeType(6.0f));
     g.setColour(accentBright);
     g.strokePath(transferCurve,juce::PathStrokeType(2.1f));
@@ -557,40 +655,18 @@ void Editor::drawDisplay(juce::Graphics& g) {
     g.setColour(juce::Colours::white);
     g.fillEllipse(mx-4.0f,my-4.0f,8.0f,8.0f);
 
-    // Only message-thread path objects; 400 fixed frames = 4 seconds at 100Hz.
-    juce::Path inputTrace,outputTrace,reductionTrace,reductionFill;
-    for(std::size_t i=0;i<history.size();++i) {
-        const auto& f=history[(head+i)%history.size()];
-        const float x=plot.getX()+plot.getWidth()*static_cast<float>(i)/
-            static_cast<float>(history.size()-1);
-        const float inY=graphY(plot,arson::gainToDb(f.input));
-        const float outY=graphY(plot,arson::gainToDb(f.output));
-        const float grY=plot.getY()+clamp01(f.reduction/30.0f)*plot.getHeight()*0.40f;
-        if(i==0) {
-            inputTrace.startNewSubPath(x,inY);
-            outputTrace.startNewSubPath(x,outY);
-            reductionTrace.startNewSubPath(x,grY);
-            reductionFill.startNewSubPath(x,plot.getY());
-            reductionFill.lineTo(x,grY);
-        } else {
-            inputTrace.lineTo(x,inY);
-            outputTrace.lineTo(x,outY);
-            reductionTrace.lineTo(x,grY);
-            reductionFill.lineTo(x,grY);
-        }
-    }
-    reductionFill.lineTo(plot.getRight(),plot.getY());
-    reductionFill.closeSubPath();
-    g.setGradientFill(juce::ColourGradient(accent.withAlpha(0.20f),
+    // These 400-point paths are computed once when fresh telemetry arrives,
+    // never rebuilt by repaint or a host redraw. All buffers live on GUI.
+    g.setGradientFill(juce::ColourGradient(accent.withAlpha(0.14f),
         plot.getX(),plot.getY(),accent.withAlpha(0.0f),
         plot.getX(),plot.getY()+plot.getHeight()*0.4f,false));
-    g.fillPath(reductionFill);
-    g.setColour(juce::Colours::white.withAlpha(0.26f));
-    g.strokePath(inputTrace,juce::PathStrokeType(1.15f));
-    g.setColour(juce::Colour{0xffd8d9d8}.withAlpha(0.63f));
-    g.strokePath(outputTrace,juce::PathStrokeType(1.15f));
-    g.setColour(accentBright.withAlpha(0.94f));
-    g.strokePath(reductionTrace,juce::PathStrokeType(1.7f));
+    g.fillPath(reductionArea);
+    g.setColour(juce::Colours::white.withAlpha(0.18f));
+    g.strokePath(inputHistory,juce::PathStrokeType(1.05f));
+    g.setColour(juce::Colour{0xffd8d9d8}.withAlpha(0.50f));
+    g.strokePath(outputHistory,juce::PathStrokeType(1.1f));
+    g.setColour(accentBright.withAlpha(0.90f));
+    g.strokePath(reductionHistory,juce::PathStrokeType(1.55f));
 
     drawMeter(g,{14.0f,plot.getY(),33.0f,plot.getHeight()},
         inChannelDb[0],inChannelDb[1],"IN",false);

@@ -9,6 +9,7 @@ public:
     void drawLinearSlider(juce::Graphics&,int,int,int,int,float,float,float,
                           const juce::Slider::SliderStyle,juce::Slider&) override;
     void drawToggleButton(juce::Graphics&,juce::ToggleButton&,bool,bool) override;
+    void drawTooltip(juce::Graphics&,const juce::String&,int,int) override;
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {
 public:
@@ -30,6 +31,7 @@ private:
     void drawMeter(juce::Graphics&,juce::Rectangle<float>,float,float,
                    const juce::String&,bool);
     void paintCompactMeters(juce::Graphics&);
+    void rebuildHistoryPaths();
     Processor& processor;
     CompLook look;
     juce::TooltipWindow tooltip{this,650};
@@ -47,15 +49,17 @@ private:
     arson::Parameters alternate, presetSnapshot;
     bool alternateActive=false;
     bool compactMode=false,thresholdDragging=false;
-    int expandedWidth=1040,expandedHeight=680;
+    int expandedWidth=900,expandedHeight=765;
     std::array<arson::MeterFrame,400> history{};
     std::size_t head=0;
     float inputDb=-120,outputDb=-120,gr=0;
+    double lastUiTickMs=0.0;
     std::array<float,2> inChannelDb{{-120.0f,-120.0f}},outChannelDb{{-120.0f,-120.0f}};
     int currentChannels=2;
     juce::Rectangle<int> display;
     juce::Image grid;
     juce::Path transferCurve,transferShade;
+    juce::Path inputHistory,outputHistory,reductionHistory,reductionArea;
     std::array<float,4> cachedCurveKey{{999,999,999,999}};
     float cachedCurveWidth=-1;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Editor)

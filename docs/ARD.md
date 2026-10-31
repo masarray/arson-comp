@@ -31,3 +31,9 @@ RAII owns GUI attachments and buffers. Timer is stopped before editor teardown. 
 ## Deferred, not represented as working
 
 Pro-C-specific styles, mid/side compression, frequency-dependent linking, auto makeup, lookahead/offline quality mode, oversampling, scalable vector accessibility polish, user preset files, ASIO standalone integration and measured proprietary sound matching. Future modes must declare latency and pass block/automation tests separately.
+
+## Focused-layout / animation CPU milestone
+
+GUI target: **900x765 default; 860x700 min; 380px MINI**, instead of 1120x760. Header reserves safe widths for logo, MINI, model, preset, SAVE, OPEN, A/B and bypass. Main row contains exactly 7 knobs with larger Threshold. Secondary row computes 6 bounded strips plus fixed right-side space for detector and three shortened flags; labels keep full descriptions in dark custom JUCE tooltips. Geometric overlap and bounds are asserted by plugin smoke at default/min sizes, including MINI/FULL restoration.
+
+GUI drawing pipeline: `resized` caches graph background and regenerates path geometry for the new size; `timerCallback` drains SPSC 100 Hz samples once then computes time-compensated meter display easing (18ms rise/210ms fall, 22ms GR rise/185ms fall); when new frames arrive, it computes and reuses four 400-point paths for the time history with lightweight visual one-pole smoothing. `drawDisplay` only strokes existing time paths, cached transfer curve and segmented LED meters at 30 Hz, with dirty-region repaint. This removes repeated per-paint conversion/path-building for ~1200 dB point calculations. All smoothing affects presentation alone; DSP has unchanged zero added algorithmic samples. If editor is hidden, timer skips heavy visualization updates; reopening drains and paints the bounded queue.

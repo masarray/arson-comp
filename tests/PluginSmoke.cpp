@@ -32,9 +32,9 @@ int main(int argc,char** argv) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
-        editor->setSize(iteration%2 ? 960 : 1120,iteration%2 ? 670 : 760);
-        if(editor->getWidth()!=(iteration%2 ? 960 : 1120) ||
-           editor->getHeight()!=(iteration%2 ? 670 : 760))return 9;
+        editor->setSize(iteration%2 ? 860 : 900,iteration%2 ? 700 : 765);
+        if(editor->getWidth()!=(iteration%2 ? 860 : 900) ||
+           editor->getHeight()!=(iteration%2 ? 700 : 765))return 9;
         const auto* threshold=editor->findChildWithID("param.threshold");
         const auto* input=editor->findChildWithID("param.input");
         const auto* ratio=editor->findChildWithID("param.ratio");
@@ -43,6 +43,31 @@ int main(int argc,char** argv) {
            !(input->getX()<attack->getX() && attack->getX()<threshold->getX() &&
              threshold->getX()<ratio->getX()))return 19;
         if(threshold->getBounds().intersects(ratio->getBounds()))return 20;
+        // Enforce responsive layout invariants at both default and minimum.
+        // This fails CI before a clipped/colliding UI ships to Windows users.
+        const auto* hp=editor->findChildWithID("param.highpass");
+        const auto* lp=editor->findChildWithID("param.lowpass");
+        const auto* detector=editor->findChildWithID("view.detector");
+        const auto* autoMode=editor->findChildWithID("view.auto");
+        const auto* external=editor->findChildWithID("view.external");
+        const auto* listen=editor->findChildWithID("view.listen");
+        const auto* style=editor->findChildWithID("view.model");
+        const auto* presets=editor->findChildWithID("view.presets");
+        const auto* save=editor->findChildWithID("preset.save");
+        const auto* load=editor->findChildWithID("preset.load");
+        if(!hp||!lp||!detector||!autoMode||!external||!listen||
+           !style||!presets||!save||!load)return 21;
+        if(lp->getRight()>detector->getX() ||
+           detector->getBounds().intersects(autoMode->getBounds()) ||
+           external->getBounds().intersects(listen->getBounds()) ||
+           style->getBounds().intersects(presets->getBounds()) ||
+           presets->getBounds().intersects(save->getBounds()) ||
+           save->getBounds().intersects(load->getBounds()))return 22;
+        for(const auto* widget : {threshold,input,ratio,attack,hp,lp,detector,
+                                  autoMode,external,listen,style,presets,save,load}) {
+            if(widget->getX()<0 || widget->getRight()>editor->getWidth() ||
+               widget->getY()<0 || widget->getBottom()>editor->getHeight())return 23;
+        }
         editor->addToDesktop(0); editor->setVisible(true);
         for(int j=0;j<1500;++j) {
             for(int i=0;i<128;++i) {
@@ -71,7 +96,7 @@ int main(int argc,char** argv) {
                 if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
             }
             mini->onClick();
-            if(editor->getHeight()!=760)return 14;
+            if(editor->getHeight()!=765)return 14;
         }
         auto image=editor->createComponentSnapshot(editor->getLocalBounds());
         if(image.isNull())return 3;
