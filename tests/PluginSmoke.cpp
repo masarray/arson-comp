@@ -1,6 +1,7 @@
 #include "../plugin/Processor.h"
 #include "../plugin/PresetIO.h"
 #include "../plugin/GraphPaint.h"
+#include "../plugin/SurfacePaint.h"
 #include "BinaryData.h"
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <iostream>
@@ -179,6 +180,30 @@ int main(int argc,char** argv) {
            image.getPixelAt(0,0).getFloatAlpha()>0.01f ||
            image.getPixelAt(9,20).getFloatAlpha()<0.9f) return 47;
     }
+    // Cached chassis must be genuinely brushed grey, while the LCD
+    // must remain deep black. Probe actual JUCE image rasterization after
+    // the Graphics lifetime ends (Windows may defer image writes).
+    {
+        juce::Image metal(juce::Image::RGB,320,220,true);
+        {
+            juce::Graphics g(metal);
+            arson::ui::paintBrushedChassis(g,320,220);
+        }
+        const auto value=metal.getPixelAt(30,25).getBrightness();
+        const auto lower=metal.getPixelAt(100,180).getBrightness();
+        if(!(value>0.19f && value<0.66f &&
+             lower>0.16f && lower<0.63f))return 50;
+        juce::Image lcd(juce::Image::RGB,320,220,true);
+        {
+            juce::Graphics g(lcd);
+            arson::ui::paintInsetGlass(g,{0.0f,0.0f,320.0f,220.0f});
+            arson::ui::paintMeterRail(g,{24.0f,21.0f,34.0f,170.0f},false);
+        }
+        const auto glass=lcd.getPixelAt(160,110).getBrightness();
+        const auto rail=lcd.getPixelAt(42,60).getBrightness();
+        if(!(glass<0.12f && rail<0.15f && value>glass+0.15f))
+            return 51;
+    }
     Processor processor;processor.prepareToPlay(48000,128);
     if(processor.getLatencySamples()!=0) return 1;
     auto* parameter=processor.state.getParameter("threshold");parameter->setValueNotifyingHost(parameter->convertTo0to1(-27));
@@ -226,6 +251,10 @@ int main(int argc,char** argv) {
             if(slider->getTooltip().isEmpty())return 49;
         }
         if(threshold->getBounds().intersects(ratio->getBounds()))return 20;
+        // New compact primary knob row: height budget for larger black LCD
+        // without collapsing control interaction areas at minimum size.
+        if(threshold->getHeight()!=82 || input->getHeight()!=82 ||
+           attack->getHeight()!=82 || ratio->getHeight()!=82)return 52;
         // Enforce responsive layout invariants at both default and minimum.
         // This fails CI before a clipped/colliding UI ships to Windows users.
         const auto* hp=editor->findChildWithID("param.highpass");
@@ -263,6 +292,11 @@ int main(int argc,char** argv) {
            range->getBounds().intersects(mix->getBounds()) ||
            dynTab->getBounds().intersects(scTab->getBounds()) ||
            autoMode->getBounds().intersects(mix->getBounds()))return 28;
+        // Toggle labels now sit LEFT of their switch tracks: verify the
+        // small control is still at least 100px wide and never clips.
+        if(autoMode->getWidth()<112 || bypass->getWidth()<110 ||
+           autoMode->getHeight()<27 || bypass->getHeight()<27)
+            return 53;
         // Explicit const base pointer type: MSVC cannot deduce one
         // initializer_list type from mixed const/non-const Component*.
         for(const juce::Component* widget :

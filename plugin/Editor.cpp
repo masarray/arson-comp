@@ -1,6 +1,7 @@
 #include "Editor.h"
 #include "PresetIO.h"
 #include "GraphPaint.h"
+#include "SurfacePaint.h"
 #include "GraphHistory.h"
 #include "BinaryData.h"
 #include <cmath>
@@ -132,63 +133,74 @@ void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
 void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float,float,
                                  const juce::Slider::SliderStyle,juce::Slider&) {
-    const float left=static_cast<float>(x)+9.0f;
-    const float right=static_cast<float>(x+w)-9.0f;
-    const float cy=static_cast<float>(y)+h*0.51f;
+    const float left=static_cast<float>(x)+10.0f;
+    const float right=static_cast<float>(x+w)-10.0f;
+    const float cy=static_cast<float>(y)+h*0.50f;
     const float end=juce::jlimit(left,right,pos);
-    g.setColour(juce::Colour{0xff373f46});
-    g.fillRoundedRectangle(left,cy-2.3f,right-left,4.6f,2.3f);
-    g.setColour(accent.withAlpha(0.84f));
-    if(end>left)g.fillRoundedRectangle(left,cy-2.3f,end-left,4.6f,2.3f);
-    // Scale supplied 18x40 transparent PNG to a restrained 10x22 track cap.
-    // Image is decoded once when LookAndFeel is constructed.
+    // A full thumb-height recessed channel. Small shadow and opposing edge
+    // highlights establish physical depth without any per-frame blur.
+    const juce::Rectangle<float> well{left-7.0f,cy-13.0f,
+                                     right-left+14.0f,26.0f};
+    g.setColour(juce::Colours::black.withAlpha(0.30f));
+    g.fillRoundedRectangle(well.translated(0.0f,1.4f),8.0f);
+    g.setColour(juce::Colour{0xff15191c});
+    g.fillRoundedRectangle(well,8.0f);
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff080b0d},
+        well.getX(),well.getY(),juce::Colour{0xff292e32},
+        well.getX(),well.getBottom(),false));
+    g.fillRoundedRectangle(well.reduced(2.0f),6.0f);
+    g.setColour(juce::Colours::black.withAlpha(0.66f));
+    g.drawLine(well.getX()+5.0f,well.getY()+2.1f,
+               well.getRight()-5.0f,well.getY()+2.1f,1.4f);
+    g.setColour(juce::Colours::white.withAlpha(0.15f));
+    g.drawLine(well.getX()+6.0f,well.getBottom()-2.2f,
+               well.getRight()-6.0f,well.getBottom()-2.2f,0.8f);
+    g.setColour(juce::Colour{0xff333a40});
+    g.fillRoundedRectangle(left,cy-2.1f,right-left,4.2f,2.1f);
+    g.setColour(accent.withAlpha(0.94f));
+    if(end-left>1.0f)
+        g.fillRoundedRectangle(left,cy-2.1f,end-left,4.2f,2.1f);
+    // Original PAN-SLIDER resource, resized only by lightweight drawImage.
     if(sliderThumb.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
         g.drawImage(sliderThumb,
             juce::Rectangle<float>{end-5.5f,cy-11.0f,11.0f,22.0f});
     } else {
-        g.setColour(accentBright);
-        g.fillRoundedRectangle(end-3.5f,cy-8.0f,7.0f,16.0f,3.0f);
+        g.setColour(juce::Colour{0xffb4b7b9});
+        g.fillRoundedRectangle(end-4.0f,cy-10.0f,8.0f,20.0f,2.0f);
     }
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
                                  bool highlighted,bool down) {
     const bool header=button.getButtonText()=="Bypass";
     const bool checked=button.getToggleState();
-    // Bypass is semantically inverted: bypass=false means ACTIVE.
     const bool enabled=header?!checked:checked;
     const float trackW=header?33.0f:32.0f;
     const float trackH=header?16.0f:15.0f;
-    const float tx=header?9.0f:(button.getWidth()-trackW)*0.5f;
-    const float ty=header?(button.getHeight()-trackH)*0.5f:1.0f;
-    const auto track=juce::Rectangle<float>(tx,ty,trackW,trackH);
-    g.setColour(enabled?juce::Colour{0xff543039}:juce::Colour{0xff282e34});
+    // Caption LEFT of the switch in both normal and header layouts.
+    const float tx=static_cast<float>(button.getWidth())-trackW-6.0f;
+    const float ty=(static_cast<float>(button.getHeight())-trackH)*0.50f;
+    const auto track=juce::Rectangle<float>{tx,ty,trackW,trackH};
+    g.setColour(juce::Colours::black.withAlpha(0.29f));
+    g.fillRoundedRectangle(track.translated(0.0f,0.9f),trackH*0.5f);
+    g.setColour(enabled?juce::Colour{0xff592c37}:juce::Colour{0xff252b30});
     g.fillRoundedRectangle(track,trackH*0.5f);
-    g.setColour(enabled?accent.withAlpha(0.70f):
-        juce::Colour{0xff545b63}.withAlpha(0.75f));
-    g.drawRoundedRectangle(track,trackH*0.5f,0.85f);
-    const float centerY=ty+trackH*0.5f;
-    const float knobR=trackH*0.5f-2.3f;
-    const float centerX=enabled?tx+trackW-trackH*0.5f:tx+trackH*0.5f;
-    g.setColour(enabled?juce::Colour{0xffff8d94}:juce::Colour{0xffb0b7bd});
-    g.fillEllipse(centerX-knobR,centerY-knobR,knobR*2,knobR*2);
-    const juce::String caption=header?(enabled?"ACTIVE":"BYPASS"):
-        button.getButtonText();
-    g.setColour(enabled?juce::Colour{0xffe5e5e5}:juce::Colour{0xff9aa3aa});
-    if(header) {
-        // One-line caption centred in its own allocated header region.
-        g.setFont(juce::FontOptions(10.4f));
-        g.drawText(caption,47,0,button.getWidth()-51,button.getHeight(),
-            juce::Justification::centredLeft,false);
-    } else {
-        g.setFont(juce::FontOptions(9.0f));
-        g.drawText(caption,0,track.getBottom()+2.0f,button.getWidth(),
-            std::max(11.0f,static_cast<float>(button.getHeight())-track.getBottom()-2.0f),
-            juce::Justification::centred,false);
-    }
+    g.setColour(enabled?accent.withAlpha(0.72f):
+                juce::Colour{0xff636b70}.withAlpha(0.76f));
+    g.drawRoundedRectangle(track,trackH*0.5f,0.8f);
+    const float knobR=trackH*0.5f-2.25f;
+    const float cx=enabled?tx+trackW-trackH*0.5f:tx+trackH*0.5f;
+    const float cy=ty+trackH*0.5f;
+    g.setColour(enabled?juce::Colour{0xffff8c92}:juce::Colour{0xffb7bbbc});
+    g.fillEllipse(cx-knobR,cy-knobR,knobR*2.0f,knobR*2.0f);
+    const auto label=header?(enabled?"ACTIVE":"BYPASS"):button.getButtonText();
+    g.setColour(enabled?juce::Colour{0xfff0efed}:juce::Colour{0xffc5c8c8});
+    g.setFont(juce::FontOptions(header?10.0f:9.5f));
+    g.drawText(label,0,0,juce::jmax(0,static_cast<int>(tx)-7),
+        button.getHeight(),juce::Justification::centredRight,false);
     if(highlighted||down) {
-        g.setColour(accent.withAlpha(down?0.35f:0.17f));
-        g.drawRoundedRectangle(track.expanded(1.5f),trackH*0.5f,0.7f);
+        g.setColour(accent.withAlpha(down?0.32f:0.13f));
+        g.drawRoundedRectangle(track.expanded(1.6f),trackH*0.5f,0.7f);
     }
 }
 juce::Font CompLook::getSliderPopupFont(juce::Slider&) { return juce::Font(juce::FontOptions(12.5f)); }
@@ -468,7 +480,7 @@ void Editor::syncPanelVisibility() {
         sidechainPanel?juce::Colour{0xff1b2025}:juce::Colour{0xff413037});
     sidechainTab.setColour(juce::TextButton::buttonColourId,
         sidechainPanel?juce::Colour{0xff413037}:juce::Colour{0xff1b2025});
-    repaint(0,compactMode?194:getHeight()-130,getWidth(),125);
+    repaint(0,compactMode?177:getHeight()-108,getWidth(),106);
 }
 void Editor::resized() {
     const int w=getWidth(),h=getHeight();
@@ -480,8 +492,10 @@ void Editor::resized() {
     compare.setBounds(w-257,20,49,30);
     fileMenu.setBounds(w-200,20,57,30);
     bypass.setBounds(w-135,21,120,28);
+    // Compact 82px knob row reserves more space for the functional LCD.
+    // Full default 900x765 and min 860x700 remain responsive.
     display=compactMode?juce::Rectangle<int>{}:
-        juce::Rectangle<int>{8,73,w-16,h-333};
+        juce::Rectangle<int>{8,73,w-16,h-298};
     const int mainY=compactMode?68:display.getBottom()+8;
     const int cell=(w-28)/7;
     constexpr std::array<std::size_t,7> main{arson::Input,arson::Attack,
@@ -489,10 +503,10 @@ void Editor::resized() {
     for(std::size_t k=0;k<main.size();++k) {
         const auto i=main[k];const int x=14+static_cast<int>(k)*cell;
         labels[i].setBounds(x,mainY+3,cell,17);
-        knobs[i].setBounds(x+3,mainY+20,cell-6,105);
+        knobs[i].setBounds(x+3,mainY+20,cell-6,82);
     }
 
-    const int bottomY=compactMode?198:h-126;
+    const int bottomY=compactMode?177:h-106;
     dynamicsTab.setBounds(16,bottomY+1,92,23);
     sidechainTab.setBounds(114,bottomY+1,94,23);
     // Main tab: four comfortable controls, plus a dedicated AUTO control.
@@ -501,24 +515,34 @@ void Editor::resized() {
         arson::Mix,arson::Link};
     for(std::size_t k=0;k<dynamics.size();++k) {
         const auto i=dynamics[k];const int x=16+static_cast<int>(k)*slot;
-        labels[i].setBounds(x,bottomY+26,slot-10,16);
-        knobs[i].setBounds(x+5,bottomY+44,slot-18,50);
+        labels[i].setBounds(x,bottomY+25,slot-10,15);
+        knobs[i].setBounds(x+5,bottomY+41,slot-18,40);
     }
-    autoRelease.setBounds(w-153,bottomY+44,139,27);
+    autoRelease.setBounds(w-153,bottomY+45,139,28);
 
     // Sidechain tab: only detector-specific controls are painted.
     constexpr std::array<std::size_t,2> filters{arson::Highpass,arson::Lowpass};
     for(std::size_t k=0;k<filters.size();++k) {
         const auto i=filters[k];const int x=17+static_cast<int>(k)*194;
-        labels[i].setBounds(x,bottomY+26,181,16);
-        knobs[i].setBounds(x+5,bottomY+44,170,50);
+        labels[i].setBounds(x,bottomY+25,181,15);
+        knobs[i].setBounds(x+5,bottomY+41,170,40);
     }
-    detector.setBounds(423,bottomY+47,104,27);
-    external.setBounds(550,bottomY+46,112,28);
-    listen.setBounds(684,bottomY+46,105,28);
+    detector.setBounds(423,bottomY+46,104,27);
+    external.setBounds(550,bottomY+44,112,30);
+    listen.setBounds(684,bottomY+44,105,30);
     // Old file buttons are intentionally non-visible.
     savePreset.setBounds(0,0,0,0);
     loadPreset.setBounds(0,0,0,0);
+    // Generate the brushed metal once on resize, not at 30Hz in paint().
+    metalSurface=juce::Image(juce::Image::RGB,w,h,true);
+    {
+        juce::Graphics chassis(metalSurface);
+        arson::ui::paintBrushedChassis(chassis,w,h);
+        // MINI meter glass is a static bezel; paint only live bar data
+        // above this cached surface during normal timer repaints.
+        if(compactMode) arson::ui::paintInsetGlass(chassis,
+            {13.0f,301.0f,static_cast<float>(w-26),49.0f});
+    }
     if(compactMode){grid=juce::Image();return;}
 
     cachedCurveWidth=-1;
@@ -526,11 +550,19 @@ void Editor::resized() {
     juce::Graphics g(grid);
     const float width=static_cast<float>(display.getWidth());
     const float height=static_cast<float>(display.getHeight());
-    g.setGradientFill(juce::ColourGradient(panel,0.0f,0.0f,bg,width,height,false));
-    g.fillAll();
+    // Independent black glass LCD covers both graph and IN/GR/OUT meter
+    // cavities. All glass effects are baked into this cached grid bitmap.
+    arson::ui::paintInsetGlass(g,{0.0f,0.0f,width,height});
     const auto plot=plotBounds().translated(-static_cast<float>(display.getX()),
                                             -static_cast<float>(display.getY()));
-    g.setColour(juce::Colour{0xff20262b}.withAlpha(0.34f));
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff070b0d},
+        plot.getX(),plot.getY(),juce::Colour{0xff020506},
+        plot.getRight(),plot.getBottom(),false));
+    g.fillRect(plot);
+    // A very faint diagonal reflection, not an opaque gray graph panel.
+    g.setGradientFill(juce::ColourGradient(
+        juce::Colours::white.withAlpha(0.034f),plot.getX(),plot.getY(),
+        juce::Colours::transparentWhite,plot.getCentreX(),plot.getBottom(),false));
     g.fillRect(plot);
     const float bottom=plot.getBottom(),left=plot.getX(),right=plot.getRight();
     for(int db=-60;db<=0;db+=6) {
@@ -668,11 +700,14 @@ void Editor::rebuildHistoryPaths() {
     reductionArea.closeSubPath();
 }
 void Editor::paint(juce::Graphics& g) {
-    g.fillAll(bg);
-    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff202528},
-        0.0f,0.0f,bg,0.0f,68.0f,false));
+    if(metalSurface.isValid())g.drawImageAt(metalSurface,0,0);
+    else g.fillAll(juce::Colour{0xff454a4d});
+    // Soft satin chassis divisions remain visible over fine brushed grain.
+    g.setColour(juce::Colours::black.withAlpha(0.22f));
     g.fillRect(0,0,getWidth(),68);
-    g.setColour(line.withAlpha(0.58f));
+    g.setColour(juce::Colours::white.withAlpha(0.12f));
+    g.drawHorizontalLine(1,0.0f,static_cast<float>(getWidth()));
+    g.setColour(juce::Colours::black.withAlpha(0.58f));
     g.drawHorizontalLine(67,0.0f,static_cast<float>(getWidth()));
     g.setFont(juce::FontOptions(19.6f));
     g.setColour(text);
@@ -680,38 +715,36 @@ void Editor::paint(juce::Graphics& g) {
     g.setColour(accent);
     g.drawText("Comp",88,11,71,28,juce::Justification::centredLeft);
     g.fillRoundedRectangle(17.0f,49.0f,37.0f,2.0f,1.0f);
-    g.setColour(muted.withAlpha(0.67f));
+    g.setColour(text.withAlpha(0.73f));
     g.setFont(juce::FontOptions(9.0f));
     g.drawText("MODEL",219,5,84,13,juce::Justification::left);
     g.drawText("PRESET",376,5,88,13,juce::Justification::left);
 
     const int mainY=compactMode?68:display.getBottom()+8;
-    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff1b2023},
-        0.0f,static_cast<float>(mainY),bg,0.0f,static_cast<float>(mainY+134),false));
-    g.fillRect(8,mainY,getWidth()-16,132);
-    g.setColour(line.withAlpha(0.45f));
+    const int bottomY=compactMode?177:getHeight()-106;
+    g.setColour(juce::Colours::black.withAlpha(0.105f));
+    g.fillRect(8,mainY,getWidth()-16,bottomY-mainY);
+    g.setColour(juce::Colours::black.withAlpha(0.40f));
     g.drawHorizontalLine(mainY,12.0f,static_cast<float>(getWidth()-12));
-    const int bottomY=compactMode?198:getHeight()-126;
     g.drawHorizontalLine(bottomY,12.0f,static_cast<float>(getWidth()-12));
-    // One subtle hairline per channel strip; no boxed, noisy borders.
+    g.setColour(juce::Colours::white.withAlpha(0.09f));
+    g.drawHorizontalLine(mainY+1,12.0f,static_cast<float>(getWidth()-12));
+    g.drawHorizontalLine(bottomY+1,12.0f,static_cast<float>(getWidth()-12));
     const int cell=(getWidth()-28)/7;
     for(int i=1;i<7;++i) {
+        g.setColour(juce::Colours::black.withAlpha(0.15f));
         const float x=14.0f+static_cast<float>(i*cell);
-        g.setColour(line.withAlpha(0.105f));
-        g.drawVerticalLine(static_cast<int>(x),static_cast<float>(mainY+18),
-                           static_cast<float>(mainY+120));
+        g.drawVerticalLine(static_cast<int>(x),static_cast<float>(mainY+17),
+                           static_cast<float>(mainY+100));
     }
-    // Tab accent sits under its single current selection only.
     g.setColour(accent.withAlpha(0.68f));
     g.fillRoundedRectangle(sidechainPanel?115.0f:17.0f,
         static_cast<float>(bottomY+22),sidechainPanel?91.0f:88.0f,1.8f,1.0f);
     if(!compactMode) {
         if(grid.isValid())g.drawImageAt(grid,display.getX(),display.getY());
-        g.setColour(juce::Colour{0xff555d60}.withAlpha(0.55f));
-        g.drawRoundedRectangle(display.toFloat(),5.0f,0.8f);
         drawDisplay(g);
     } else paintCompactMeters(g);
-    g.setColour(muted.withAlpha(0.56f));
+    g.setColour(text.withAlpha(0.66f));
     g.setFont(juce::FontOptions(9.0f));
     g.drawText("0 SAMPLES ADDED  /  REALTIME DSP",
         14,getHeight()-18,290,14,juce::Justification::left);
@@ -848,8 +881,7 @@ void Editor::drawDisplay(juce::Graphics& g) {
     }
 }
 void Editor::paintCompactMeters(juce::Graphics& g) {
-    g.setColour(juce::Colour{0xff151a1e});
-    g.fillRoundedRectangle(13.0f,301.0f,static_cast<float>(getWidth()-26),49.0f,4.0f);
+    // The black LCD bezel and glass are baked into metalSurface on resize.
     const float values[]{inputDb,gr,outputDb};
     const char* labelsText[]{"INPUT","GAIN REDUCTION","OUTPUT"};
     const int segment=(getWidth()-42)/3;

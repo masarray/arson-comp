@@ -52,3 +52,7 @@ Run the supplied Standalone on your audio interface and load the complete VST3 i
 ### New compact controls and value popups
 
 All knobs now show a larger coral arc **behind** the black metal asset and a small coral pointer dot near the rim. The numerical boxes under knobs/sliders have been removed for an uncluttered control strip: hover for current value/unit tooltip, drag for a transient value bubble, and double-click a knob to restore its factory value. All AUTO/EXT SC/LISTEN and header ACTIVE/BYPASS controls use small track switches. The linear sliders use the original user-supplied PAN-SLIDER black metallic thumb. This is GUI-only; zero added algorithmic DSP samples are unchanged.
+
+### Premium brushed-metal and glass UI
+
+The updated full editor should now have a horizontally brushed grey metal background and a recessed jet-black LCD for the dynamics history/transfer graph and segmented IN/GR/OUT meters. The knob area is shorter, leaving more room for the screen. Range/Hold/Mix/Link/HP/LP rails have a deep shadowed well sized to the original metallic thumb; all toggle captions appear on the left of their switches, including ACTIVE/BYPASS in the header. Both DYNAMICS and SIDECHAIN pages, MINI, old presets/automation and all audio routes continue working. No plugin audio processing or added algorithmic sample delay has changed.

@@ -21,6 +21,17 @@ inline juce::ColourGradient makeEdgeFade(juce::Colour colour,float x0,float x1,
 // 30Hz paint path. Active LEDs alone are painted over the rails at runtime.
 inline void paintMeterRail(juce::Graphics& g,juce::Rectangle<float> bounds,
                            bool gainReduction) {
+    // Inset black-glass meter LCD with its own bezel, cached with the
+    // main scope. Only illuminated LED segments are painted per UI tick.
+    const auto well=bounds.expanded(4.0f,3.0f);
+    g.setColour(juce::Colours::black.withAlpha(0.68f));
+    g.fillRoundedRectangle(well.translated(0.0f,1.0f),3.5f);
+    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff030608},
+        well.getX(),well.getY(),juce::Colour{0xff131a1d},
+        well.getRight(),well.getBottom(),false));
+    g.fillRoundedRectangle(well,3.5f);
+    g.setColour(juce::Colour{0xff788185}.withAlpha(0.20f));
+    g.drawRoundedRectangle(well,3.5f,0.7f);
     const int bars=gainReduction?1:2;
     const float bw=bars==1?13.0f:9.0f;
     const float spacing=3.0f, total=bw*bars+spacing*(bars-1);
@@ -29,9 +40,9 @@ inline void paintMeterRail(juce::Graphics& g,juce::Rectangle<float> bounds,
     const float segmentH=bounds.getHeight()/static_cast<float>(segments);
     for(int channel=0;channel<bars;++channel) {
         const float bx=start+channel*(bw+spacing);
-        g.setColour(juce::Colour{0xff20262a});
+        g.setColour(juce::Colour{0xff0d1215});
         g.fillRect(bx,bounds.getY(),bw,bounds.getHeight());
-        g.setColour(juce::Colour{0xff313637}.withAlpha(0.52f));
+        g.setColour(juce::Colour{0xff262c30}.withAlpha(0.58f));
         for(int step=0;step<segments;++step) {
             const float yy=bounds.getY()+step*segmentH;
             g.fillRect(bx,yy,bw,std::max(1.0f,segmentH-1.2f));

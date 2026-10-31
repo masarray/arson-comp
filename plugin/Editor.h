@@ -68,7 +68,7 @@ private:
     std::array<float,2> inChannelDb{{-120.0f,-120.0f}},outChannelDb{{-120.0f,-120.0f}};
     int currentChannels=2;
     juce::Rectangle<int> display;
-    juce::Image grid;
+    juce::Image grid,metalSurface; // cached full chassis and black glass LCD
     juce::Path transferCurve,transferShade;
     juce::Path inputHistory,outputHistory,reductionHistory,reductionArea;
     // Six cached horizontal gradient brushes: input, output, GR, transfer,

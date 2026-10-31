@@ -60,3 +60,11 @@ Verify default 1120x760, minimum 960x670 and compact 380px Windows screenshot ge
 - All previous checkbox surfaces must render as compact capsule switches. DYNAMICS AUTO and SIDECHAIN EXT/LISTEN captions sit underneath; header ACTIVE text must not overlap the switch and must change to BYPASS when bypassed.
 - Supplied source `PAN-SLIDER.png` is in `ArSonCompKnobAssets`; smoke asserts it decodes as 18×40 and contains transparent corners plus opaque center. Thumb is 11×22 in render.
 - All prior host bus integration failure branches now emit a numeric `HOST_BUS_INTEGRATION_FAILED` diagnostic. Failures are not suppressed; no claim of new Windows artifact until that test and engine contract both pass.
+
+## Premium black-glass / brushed-metal acceptance
+
+- Two rendered JUCE RGB canvases: brushed-metal brightness must be visibly above LCD black, and both glass and meter rail should remain near-black. Tests sample finished bitmaps **after** Graphics scope to catch Windows deferred rasterization.
+- Main knob controls are exactly 82px high (previously 105px) at both default and minimum size; transfer display gains height. Confirm accessible drag range, pointer dots, larger behind-dial coral arcs and tooltip values unchanged.
+- Full 900x765 and minimum 860x700 screenshot: charcoal-brushed metal chassis with subtle horizontal micrograin; full transfer/dynamics LCD is black glass with thin specular border and black LED IN/GR/OUT wells. The body is not filled with expensive per-frame noise or visual DSP.
+- Secondary sliders: a dark, 26px-deep shadowed inset holds the same original 22px metal thumb. Captions for AUTO, EXT SC, LISTEN and ACTIVE/BYPASS sit to the left of each toggle switch; no overlays or clips in full, compact or sidechain layout.
+- All prior engine_contract and plugin_state_editor regressions remain required. Confirm Windows CI success and actual screenshots; physical host validation remains separate.
