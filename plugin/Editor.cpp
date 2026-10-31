@@ -364,8 +364,11 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     presets.onChange=[this] {
         const int id=presets.getSelectedId();
         if(id==1000) {
+            // Opening and dismissing a browser must NOT lose the currently
+            // loaded preset title (or a user-restored custom name).
+            const auto name=presets.getText();
             presets.setSelectedId(0,juce::dontSendNotification);
-            presets.setText("Browse presets",juce::dontSendNotification);
+            presets.setText(name,juce::dontSendNotification);
             openPresetBrowser();
         } else if(id>0) applyPreset(id);
     };

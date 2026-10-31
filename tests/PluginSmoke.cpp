@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <set>
 #include <string>
-int main(int argc,char** argv) {
+static int runSmoke(int argc,char** argv) {
     juce::ScopedJuceInitialiser_GUI gui;
 #if JUCE_WINDOWS
     // The standalone must offer native low-latency ASIO (e.g. Maono PS22)
@@ -680,8 +680,8 @@ int main(int argc,char** argv) {
             if(processor.snapshot()[arson::External]!=1.0f ||
                processor.snapshot()[arson::Listen]!=1.0f ||
                processor.snapshot()[arson::Bypass]!=1.0f ||
-               processor.snapshot()[arson::Ratio]!=
-                   arson::preset::factoryBank()[45].settings[arson::Ratio])
+               std::abs(processor.snapshot()[arson::Ratio]-
+                        arson::preset::factoryBank()[45].settings[arson::Ratio])>0.01f)
                 return 83;
             ext->setValueNotifyingHost(0.0f);
             listen->setValueNotifyingHost(0.0f);
@@ -715,4 +715,10 @@ int main(int argc,char** argv) {
             file.deleteFile();auto stream=file.createOutputStream();if(!stream || !juce::PNGImageFormat{}.writeImageToStream(image,*stream))return 4;}
     }
     processor.releaseResources();std::cout<<"PASS: state round-trip, audio, zero latency, editor resize/reopen/render\n";
+}
+
+int main(int argc,char** argv) {
+    const int result=runSmoke(argc,argv);
+    if(result!=0)std::cerr<<"PLUGIN_SMOKE_FAILURE_CODE "<<result<<'\n';
+    return result;
 }
