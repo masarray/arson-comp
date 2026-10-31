@@ -19,7 +19,13 @@ void Compressor::prepare(double rate,const Parameters& initial) noexcept {
     hpState={}; lpState={}; rms={}; envelope={}; smoothEnvelope={}; previousGain={1.0f,1.0f}; holdRemaining={}; meter={}; meterCount=0;
     rmsCoeff=static_cast<float>(std::exp(-1.0/(0.01*fs)));
     p=initial; p.sanitize();
-    for(std::size_t i=0;i<Count;++i) smooth[i].reset(rampTarget(i,p[i],fs));
+    for(std::size_t i=0;i<Count;++i) {
+        smooth[i].reset(rampTarget(i,p[i],fs));
+        currentValues[i]=smooth[i].current;
+    }
+    activeRampCount=0;
+    lowerKneeLinear=dbToGain(p[Threshold]-0.5f*p[Knee]);
+    staticKneeGate=true;
     filterWet[0].reset(p[Highpass]>20.01f ? 1.0f : 0.0f);
     filterWet[1].reset(p[Lowpass]<19999.0f ? 1.0f : 0.0f);
     attackCoeff=static_cast<float>(std::exp(-1000.0/(p[Attack]*fs)));
@@ -45,12 +51,24 @@ void Compressor::setParameters(Parameters next) noexcept {
     if(next[Lowpass]!=p[Lowpass])
         filterWet[1].set(next[Lowpass]<19999.0f ? 1.0f : 0.0f,rampLength);
     p=next;
+    // Build a tiny stack-owned active index list once per host block, never
+    // iterate 19 inactive one-pole ramps per AUDIO SAMPLE.
+    activeRampCount=0;
+    for(std::size_t i=0;i<Count;++i)
+        if(smooth[i].remaining>0)
+            activeRampIndices[activeRampCount++]=static_cast<std::uint8_t>(i);
+    staticKneeGate=smooth[Threshold].remaining==0 && smooth[Knee].remaining==0;
+    if(staticKneeGate)
+        lowerKneeLinear=dbToGain(p[Threshold]-0.5f*p[Knee]);
 }
 void Compressor::process(float* const* audio,int channels,int samples,const float* const* sc,int scChannels,MeterQueue* meters) noexcept {
     if(!audio || channels<1 || channels>2 || samples<=0) return;
     for(int n=0;n<samples;++n) {
-        std::array<float,Count> v{};
-        for(std::size_t i=0;i<Count;++i) v[i]=smooth[i].next();
+        for(std::size_t k=0;k<activeRampCount;++k) {
+            const auto i=activeRampIndices[k];
+            currentValues[i]=smooth[i].next();
+        }
+        const auto& v=currentValues;
         const float inputGain=v[Input],makeupGain=v[Makeup];
         const float hpCoeff=v[Highpass],lpCoeff=v[Lowpass];
         // Clean feedforward; Feedback senses prior actual attenuation;
@@ -81,7 +99,14 @@ void Compressor::process(float* const* audio,int channels,int samples,const floa
         const float linked=std::max(detected[0],detected[channels-1]);
         for(int c=0;c<channels;++c) {
             const float detector=detected[c]+(linked-detected[c])*(v[Link]*0.01f);
-            const float target=reduction(gainToDb(detector),v[Threshold],v[Ratio],v[Knee],v[Range]);
+            // All compressor styles share a mathematically zero static curve
+            // below threshold - knee/2. For steady threshold/knee, avoid the
+            // expensive log10 entirely. A tiny guard accommodates float
+            // rounding near the knee boundary; dynamic automation uses the
+            // unmodified exact path.
+            const float target=(staticKneeGate &&
+                detector<lowerKneeLinear*0.99999f) ? 0.0f :
+                reduction(gainToDb(detector),v[Threshold],v[Ratio],v[Knee],v[Range]);
             auto& env=envelope[c];
             if(target>env) { env=target+attackCoeff*(env-target); holdRemaining[c]=holdSamples; }
             else if(holdRemaining[c]>0) --holdRemaining[c];
@@ -97,7 +122,10 @@ void Compressor::process(float* const* audio,int channels,int samples,const floa
                 smoothEnvelope[c]=flush(env+coeff*(smoothEnvelope[c]-env));
             } else smoothEnvelope[c]=env;
             const float effectiveEnv=env+(smoothEnvelope[c]-env)*smoothWeight;
-            const float attenuation=dbToGain(-effectiveEnv);
+            // exp(0) == 1 exactly. Sparse idle/no-GR sections therefore
+            // bypass exponential gain conversion without sonic approximation.
+            const float attenuation=effectiveEnv==0.0f ? 1.0f :
+                dbToGain(-effectiveEnv);
             previousGain[c]=attenuation;
             const float wet=dry[c]*attenuation*makeupGain;
             float out=dry[c]+(wet-dry[c])*(v[Mix]*0.01f);

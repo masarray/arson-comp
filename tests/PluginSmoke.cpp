@@ -140,13 +140,22 @@ int main(int argc,char** argv) {
         if(std::abs(signal.getSample(0,blockSize-1)-0.05f)>0.002f ||
            std::abs(signal.getSample(1,blockSize-1)-0.025f)>0.002f)return failHost(40);
 
-        // Host bypass path must ignore Input/Makeup and output the exact
-        // input waveform after the finite click-avoidance transition.
+        // Host bypass MUST be transparent from its very first sample, even
+        // with large active input/makeup gains and a running detector.
         if(!set("input",12.0f)||!set("makeup",12.0f))return failHost(41);
-        for(int b=0;b<12;++b)process(true);
-        if(std::abs(signal.getSample(0,blockSize-1)-0.05f)>1.0e-5f ||
-           std::abs(signal.getSample(1,blockSize-1)-0.025f)>1.0e-5f)
-            return failHost(42);
+        process(true);
+        for(int i=0;i<blockSize;++i) {
+            if(signal.getSample(0,i)!=0.05f ||
+               signal.getSample(1,i)!=0.025f ||
+               signal.getSample(2,i)!=1.0f)return failHost(42);
+        }
+        // It must not latch the APVTS bypass switch when processing resumes.
+        if(live.snapshot()[arson::Bypass]!=0.0f)return failHost(43);
+        if(!set("input",0.0f)||!set("makeup",0.0f)||
+           !set("external",1.0f))return failHost(41);
+        for(int b=0;b<warmup;++b)process(false);
+        if(!(signal.getSample(0,blockSize-1)<0.045f &&
+             signal.getSample(1,blockSize-1)<0.025f))return failHost(42);
         if(live.getLatencySamples()!=0)return failHost(43);
     }
     {
