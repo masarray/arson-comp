@@ -1,5 +1,6 @@
 #include "Editor.h"
 #include "PresetIO.h"
+#include "FactoryPresetBank.h"
 #include "GraphPaint.h"
 #include "SurfacePaint.h"
 #include "GraphHistory.h"
@@ -346,11 +347,31 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     addAndMakeVisible(style);
     styleAttachment=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         p.state,"style",style);
-    presets.addItemList({"Default","Vocal | gentle","Vocal | level",
-        "Mix bus | glue","Drums | punch","Podcast | steady"},1);
+    // The header stays small; factory bank is ordered into real categories.
+    // Search / favorites / details live in a transient overlay, not in toolbar.
     presets.setComponentID("view.presets");
-    presets.onChange=[this] {applyPreset(presets.getSelectedId());};
+    presets.addItem("SEARCH / BROWSE PRESETS...",1000);
+    const auto& bank=arson::preset::factoryBank();
+    juce::String lastCategory;
+    for(std::size_t i=0;i<bank.size();++i) {
+        const juce::String cat(bank[i].category);
+        if(cat!=lastCategory) {
+            presets.addSectionHeading(cat.toUpperCase());
+            lastCategory=cat;
+        }
+        presets.addItem(bank[i].name,static_cast<int>(i)+1);
+    }
+    presets.onChange=[this] {
+        const int id=presets.getSelectedId();
+        if(id==1000) {
+            presets.setSelectedId(0,juce::dontSendNotification);
+            presets.setText("Browse presets",juce::dontSendNotification);
+            openPresetBrowser();
+        } else if(id>0) applyPreset(id);
+    };
     addAndMakeVisible(presets);
+    presetBrowser.setComponentID("view.preset.browser");
+    addChildComponent(presetBrowser);
     detector.addItemList({"Peak","RMS"},1);
     detector.setComponentID("view.detector");
     addAndMakeVisible(detector);
@@ -438,12 +459,15 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         juce::PopupMenu menu;
         menu.addItem(1,"Save preset...");
         menu.addItem(2,"Open preset...");
+        menu.addSeparator();
+        menu.addItem(3,"Browse factory bank...");
         juce::Component::SafePointer<Editor> safe(this);
         menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&fileMenu),
             [safe](int item) {
                 if(auto* editor=safe.getComponent()) {
                     if(item==1 && editor->savePreset.onClick)editor->savePreset.onClick();
                     else if(item==2 && editor->loadPreset.onClick)editor->loadPreset.onClick();
+                    else if(item==3)editor->openPresetBrowser();
                 }
             });
     };
@@ -485,8 +509,10 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     updateHoverReadout(hoveredParameter);
     arson::MeterFrame discard;
     for(std::uint32_t i=0;i<arson::MeterQueue::capacity && p.meters.pop(discard);++i){}
-    presets.setSelectedId(0,juce::dontSendNotification);
-    presets.setText("Custom / restored",juce::dontSendNotification);
+    presetSnapshot=arson::preset::factoryBank().front().settings;
+    presets.setSelectedId(1,juce::dontSendNotification);
+    presets.setText(arson::preset::factoryBank().front().name,
+                    juce::dontSendNotification);
     setResizable(true,true);
     setResizeLimits(arson::ui::EditorMetrics::minWidth,
         arson::ui::EditorMetrics::minHeight,
@@ -532,6 +558,179 @@ void Editor::GraphCanvas::mouseMove(const juce::MouseEvent& e) {
     owner.mouseMove(e.getEventRelativeTo(&owner));
     setMouseCursor(owner.getMouseCursor());
 }
+Editor::PresetBrowser::PresetBrowser(Editor& editor):owner(editor) {
+    setOpaque(true);
+    heading.setText("PRESET LIBRARY",juce::dontSendNotification);
+    heading.setFont(juce::FontOptions(14.0f));
+    heading.setColour(juce::Label::textColourId,juce::Colour{0xffe5eaee});
+    addAndMakeVisible(heading);
+    search.setMultiLine(false);
+    search.setTextToShowWhenEmpty("Search names, categories, tags, descriptions...",
+                                  juce::Colour{0xffaab6bb});
+    search.setColour(juce::TextEditor::backgroundColourId,juce::Colour{0xff182027});
+    search.setColour(juce::TextEditor::textColourId,juce::Colours::white);
+    search.setColour(juce::TextEditor::outlineColourId,juce::Colour{0xff536068});
+    search.onTextChange=[this] {rebuildFilter();};
+    search.addKeyListener(this);
+    addAndMakeVisible(search);
+    resultList.setModel(this);
+    resultList.setRowHeight(28);
+    resultList.setColour(juce::ListBox::backgroundColourId,juce::Colour{0xff11191e});
+    resultList.addKeyListener(this);
+    addAndMakeVisible(resultList);
+    detail.setMultiLine(true);
+    detail.setReadOnly(true);
+    detail.setCaretVisible(false);
+    detail.setScrollbarsShown(false);
+    detail.setColour(juce::TextEditor::backgroundColourId,juce::Colour{0xff1c252a});
+    detail.setColour(juce::TextEditor::textColourId,juce::Colour{0xffe2e8eb});
+    detail.setColour(juce::TextEditor::outlineColourId,juce::Colour{0xff35424a});
+    addAndMakeVisible(detail);
+    subheading.setFont(juce::FontOptions(10.0f));
+    subheading.setColour(juce::Label::textColourId,juce::Colour{0xffa4b0b6});
+    addAndMakeVisible(subheading);
+    for(auto* button:{&favoritesOnly,&star,&use,&close})addAndMakeVisible(*button);
+    favorites.assign(arson::preset::factoryBank().size(),false);
+    const auto file=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("ArSonAudio/ArSonComp/favorites.txt");
+    if(file.existsAsFile()) {
+        juce::StringArray lines;
+        lines.addLines(file.loadFileAsString());
+        for(const auto& id:lines) {
+            const int index=arson::preset::findFactoryId(id.toStdString());
+            if(index>=0)favorites[static_cast<std::size_t>(index)]=true;
+        }
+    }
+    favoritesOnly.onClick=[this] {
+        showOnlyFavorites=!showOnlyFavorites;
+        favoritesOnly.setButtonText(showOnlyFavorites?"ALL":"FAVORITES");
+        rebuildFilter();
+    };
+    star.onClick=[this] {
+        const int row=resultList.getSelectedRow();
+        if(row<0 || static_cast<std::size_t>(row)>=matches.size())return;
+        const auto i=static_cast<std::size_t>(matches[static_cast<std::size_t>(row)]);
+        favorites[i]=!favorites[i];
+        persistFavorites();
+        if(showOnlyFavorites && !favorites[i])rebuildFilter();
+        else {resultList.repaint();showDetails();}
+    };
+    use.onClick=[this]{applySelected(false);};
+    close.onClick=[this]{setVisible(false);};
+    rebuildFilter();
+}
+Editor::PresetBrowser::~PresetBrowser(){resultList.setModel(nullptr);}
+void Editor::PresetBrowser::open() {
+    search.clear();
+    showOnlyFavorites=false;
+    favoritesOnly.setButtonText("FAVORITES");
+    rebuildFilter();
+    setVisible(true);
+    toFront(true);
+    search.grabKeyboardFocus();
+}
+void Editor::PresetBrowser::persistFavorites() const {
+    const auto file=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("ArSonAudio/ArSonComp/favorites.txt");
+    if(file.getParentDirectory().createDirectory().failed())return;
+    juce::String data;
+    const auto& bank=arson::preset::factoryBank();
+    for(std::size_t i=0;i<bank.size();++i)
+        if(favorites[i])data+=juce::String(bank[i].id)+"\n";
+    file.replaceWithText(data);
+}
+void Editor::PresetBrowser::rebuildFilter(){
+    matches.clear();
+    const auto query=search.getText().trim().toLowerCase();
+    const auto& bank=arson::preset::factoryBank();
+    for(std::size_t i=0;i<bank.size();++i) {
+        if(showOnlyFavorites && !favorites[i])continue;
+        const auto& p=bank[i];
+        const auto haystack=(juce::String(p.category)+" "+p.name+" "+p.tags+
+                              " "+p.description).toLowerCase();
+        if(query.isEmpty()||haystack.contains(query))matches.push_back(static_cast<int>(i));
+    }
+    resultList.updateContent();
+    if(!matches.empty())resultList.selectRow(0);
+    else resultList.deselectAllRows();
+    subheading.setText(juce::String(matches.size())+" of "+
+        juce::String(bank.size())+" presets",juce::dontSendNotification);
+    showDetails();
+}
+int Editor::PresetBrowser::getNumRows(){return static_cast<int>(matches.size());}
+void Editor::PresetBrowser::paintListBoxItem(int row,juce::Graphics& g,
+                                             int width,int height,bool selected) {
+    if(row<0||static_cast<std::size_t>(row)>=matches.size())return;
+    const auto index=static_cast<std::size_t>(matches[static_cast<std::size_t>(row)]);
+    const auto& p=arson::preset::factoryBank()[index];
+    if(selected)g.fillAll(juce::Colour{0xff344b56});
+    else if(row%2==0)g.fillAll(juce::Colour{0xff172025});
+    g.setFont(juce::FontOptions(10.5f));
+    g.setColour(juce::Colour{0xffb9c5cb});
+    g.drawText(p.category,9,0,93,height,juce::Justification::centredLeft,true);
+    g.setColour(juce::Colour{0xffeef2f3});
+    g.setFont(juce::FontOptions(11.0f));
+    g.drawText(p.name,106,0,juce::jmax(0,width-130),height,
+               juce::Justification::centredLeft,true);
+    if(favorites[index]){
+        g.setColour(juce::Colour{0xffedc579});
+        g.drawText("*",width-21,0,15,height,juce::Justification::centred);
+    }
+}
+void Editor::PresetBrowser::selectedRowsChanged(int){showDetails();}
+void Editor::PresetBrowser::showDetails(){
+    const int row=resultList.getSelectedRow();
+    if(row<0||static_cast<std::size_t>(row)>=matches.size()){
+        detail.setText("No matching presets",false);
+        star.setEnabled(false);use.setEnabled(false);return;
+    }
+    const auto i=static_cast<std::size_t>(matches[static_cast<std::size_t>(row)]);
+    const auto& p=arson::preset::factoryBank()[i];
+    detail.setText(juce::String(p.name)+"\n"+p.category+
+        "  |  ArSon Audio\n\n"+p.description+
+        "\n\nTags: "+p.tags+
+        "\n\nStart here; adjust threshold for the source level.",false);
+    star.setButtonText(favorites[i]?"UNSTAR":"STAR");
+    star.setEnabled(true);use.setEnabled(true);
+}
+void Editor::PresetBrowser::applySelected(bool closeAfter){
+    const int row=resultList.getSelectedRow();
+    if(row<0||static_cast<std::size_t>(row)>=matches.size())return;
+    owner.applyPreset(matches[static_cast<std::size_t>(row)]+1);
+    if(closeAfter)setVisible(false);
+}
+void Editor::PresetBrowser::listBoxItemDoubleClicked(int row,const juce::MouseEvent&) {
+    if(row>=0&&static_cast<std::size_t>(row)<matches.size()){
+        resultList.selectRow(row);
+        applySelected(true);
+    }
+}
+bool Editor::PresetBrowser::keyPressed(const juce::KeyPress& key,juce::Component*){
+    if(key==juce::KeyPress::escapeKey){setVisible(false);return true;}
+    if(key==juce::KeyPress::returnKey){applySelected(false);return true;}
+    return false;
+}
+void Editor::PresetBrowser::paint(juce::Graphics& g){
+    g.fillAll(juce::Colour{0xff20282c});
+    const auto r=getLocalBounds().toFloat().reduced(0.75f);
+    g.setColour(juce::Colour{0xff63747d});
+    g.drawRoundedRectangle(r,6.0f,1.2f);
+}
+void Editor::PresetBrowser::resized(){
+    const int w=getWidth(),h=getHeight();
+    const int rightW=juce::jmax(165,w*34/100);
+    const int leftW=w-rightW-26;
+    heading.setBounds(14,8,w-130,25);
+    close.setBounds(w-77,10,63,24);
+    search.setBounds(14,39,leftW,29);
+    favoritesOnly.setBounds(14,75,91,23);
+    subheading.setBounds(115,75,leftW-111,23);
+    const int listY=105, listH=juce::jmax(60,h-listY-14);
+    resultList.setBounds(14,listY,leftW,listH);
+    detail.setBounds(leftW+23,39,rightW-8,juce::jmax(80,h-131));
+    star.setBounds(leftW+23,h-80,juce::jmax(70,(rightW-15)/2),27);
+    use.setBounds(leftW+30+(rightW-15)/2,h-80,juce::jmax(68,(rightW-15)/2-7),27);
+}
 void Editor::setValue(std::size_t i,float value) {
     if(auto* parameter=processor.state.getParameter(arson::specs[i].id)) {
         parameter->beginChangeGesture();
@@ -540,25 +739,25 @@ void Editor::setValue(std::size_t i,float value) {
     }
 }
 void Editor::applyPreset(int id) {
-    if(id<1)return;
-    arson::Parameters p;
-    if(id==2) {p.value[arson::Ratio]=2.5f;p.value[arson::Attack]=15;
-        p.value[arson::Release]=180;p.value[arson::Knee]=12;p.value[arson::Style]=2;}
-    if(id==3) {p.value[arson::Threshold]=-24;p.value[arson::Ratio]=3;
-        p.value[arson::Detector]=1;p.value[arson::AutoRelease]=1;
-        p.value[arson::Highpass]=100;p.value[arson::Style]=1;}
-    if(id==4) {p.value[arson::Ratio]=2;p.value[arson::Attack]=30;
-        p.value[arson::Release]=250;p.value[arson::Knee]=12;
-        p.value[arson::Range]=6;p.value[arson::Highpass]=80;p.value[arson::Style]=2;}
-    if(id==5) {p.value[arson::Ratio]=5;p.value[arson::Attack]=25;
-        p.value[arson::Release]=80;p.value[arson::Knee]=3;p.value[arson::Mix]=75;}
-    if(id==6) {p.value[arson::Threshold]=-24;p.value[arson::Ratio]=4;
-        p.value[arson::Attack]=5;p.value[arson::Release]=180;
-        p.value[arson::Knee]=12;p.value[arson::Highpass]=100;
-        p.value[arson::AutoRelease]=1;p.value[arson::Style]=2;}
-    presetSnapshot=p;
-    for(std::size_t i=0;i<arson::Count;++i)
-        if(i!=arson::External && i!=arson::Listen && i!=arson::Bypass)setValue(i,p[i]);
+    const auto& bank=arson::preset::factoryBank();
+    if(id<1 || static_cast<std::size_t>(id)>bank.size())return;
+    const auto& p=bank[static_cast<std::size_t>(id)-1];
+    // Keep the safety-critical live routing/bypass state unchanged. These
+    // user switches must never be set merely by auditioning a factory sound.
+    for(std::size_t i=0;i<arson::Count;++i) {
+        if(i==arson::External || i==arson::Listen || i==arson::Bypass)continue;
+        setValue(i,p.settings[i]);
+    }
+    presetSnapshot=p.settings;
+    presets.setSelectedId(id,juce::dontSendNotification);
+    presets.setText(p.name,juce::dontSendNotification);
+    cachedCurveKey[0]=999;
+    graphCanvas.repaint();
+}
+void Editor::openPresetBrowser() {
+    presetBrowser.setBounds(juce::Rectangle<int>{12,61,getWidth()-24,
+        juce::jmax(220,getHeight()-73)});
+    presetBrowser.open();
 }
 juce::Rectangle<float> Editor::plotBounds() const noexcept {
     if(compactMode || display.isEmpty())return {};
@@ -597,6 +796,7 @@ void Editor::resized() {
     compact.setBounds(header.mini);
     style.setBounds(header.model);
     presets.setBounds(header.preset);
+    presetBrowser.setBounds(12,61,w-24,juce::jmax(220,h-73));
     compare.setBounds(header.compare);
     fileMenu.setBounds(header.file);
     bypass.setBounds(header.bypass);

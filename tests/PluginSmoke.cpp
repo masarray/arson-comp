@@ -2,6 +2,7 @@
 #include "../plugin/Editor.h"
 #include "../plugin/HeaderLayout.h"
 #include "../plugin/PresetIO.h"
+#include "../plugin/FactoryPresetBank.h"
 #include "../plugin/GraphPaint.h"
 #include "../plugin/SurfacePaint.h"
 #include "BinaryData.h"
@@ -11,6 +12,8 @@
 #include <initializer_list>
 #include <cmath>
 #include <algorithm>
+#include <set>
+#include <string>
 int main(int argc,char** argv) {
     juce::ScopedJuceInitialiser_GUI gui;
 #if JUCE_WINDOWS
@@ -386,6 +389,36 @@ int main(int argc,char** argv) {
             return 51;
         }
     }
+    // All 46 original factory programs: unique IDs, safe bounds, finite DSP.
+    {
+        const auto& bank=arson::preset::factoryBank();
+        if(bank.size()!=46)return 73;
+        std::set<std::string> ids,categories;
+        for(const auto& entry:bank) {
+            if(!ids.insert(entry.id).second || !entry.category[0] ||
+               !entry.name[0] || !entry.description[0])return 74;
+            categories.insert(entry.category);
+            auto normalized=entry.settings;
+            normalized.sanitize();
+            if(normalized.value!=entry.settings.value ||
+               entry.settings[arson::External]!=0 ||
+               entry.settings[arson::Listen]!=0 ||
+               entry.settings[arson::Bypass]!=0)return 75;
+            if(arson::preset::findFactoryId(entry.id)<0)return 76;
+            arson::Compressor engine;
+            engine.prepare(48000.0,entry.settings);
+            std::array<float,128> left{},right{};
+            for(int i=0;i<128;++i) {
+                left[i]=0.34f*std::sin(i*0.091f);
+                right[i]=0.22f*std::cos(i*0.11f);
+            }
+            float* audio[]{left.data(),right.data()};
+            engine.process(audio,2,128);
+            for(int i=0;i<128;++i)
+                if(!std::isfinite(left[i])||!std::isfinite(right[i]))return 77;
+        }
+        if(categories.size()!=10)return 78;
+    }
     Processor processor;processor.prepareToPlay(48000,128);
     if(processor.getLatencySamples()!=0) return 1;
     auto* parameter=processor.state.getParameter("threshold");parameter->setValueNotifyingHost(parameter->convertTo0to1(-27));
@@ -615,6 +648,44 @@ int main(int argc,char** argv) {
             if(!stream || !juce::PNGImageFormat{}.writeImageToStream(picture,*stream))
                 return 31;
             mainTab->onClick();
+        }
+        // Search browser is a genuine in-plugin overlay with rich metadata.
+        if(iteration==3) {
+            auto* combo=dynamic_cast<juce::ComboBox*>(
+                editor->findChildWithID("view.presets"));
+            auto* browser=editor->findChildWithID("view.preset.browser");
+            if(!combo||!browser||browser->isVisible())return 79;
+            combo->setSelectedId(1000,juce::sendNotificationSync);
+            if(!browser->isVisible()||browser->getWidth()<500 ||
+               browser->getHeight()<220)return 80;
+            if(argc>1) {
+                const auto image=editor->createComponentSnapshot(editor->getLocalBounds());
+                auto target=juce::File(juce::String::fromUTF8(argv[1]));
+                target=target.getSiblingFile(
+                    target.getFileNameWithoutExtension()+"-browser.png");
+                auto stream=target.createOutputStream();
+                if(!stream||!juce::PNGImageFormat{}.writeImageToStream(image,*stream))
+                    return 81;
+            }
+            browser->setVisible(false);
+            // Live routing, monitoring and bypass survive preset audition.
+            auto* ext=processor.state.getParameter("external");
+            auto* listen=processor.state.getParameter("listen");
+            auto* bypass=processor.state.getParameter("bypass");
+            if(!ext||!listen||!bypass)return 82;
+            ext->setValueNotifyingHost(ext->convertTo0to1(1.0f));
+            listen->setValueNotifyingHost(listen->convertTo0to1(1.0f));
+            bypass->setValueNotifyingHost(bypass->convertTo0to1(1.0f));
+            combo->setSelectedId(46,juce::sendNotificationSync);
+            if(processor.snapshot()[arson::External]!=1.0f ||
+               processor.snapshot()[arson::Listen]!=1.0f ||
+               processor.snapshot()[arson::Bypass]!=1.0f ||
+               processor.snapshot()[arson::Ratio]!=
+                   arson::preset::factoryBank()[45].settings[arson::Ratio])
+                return 83;
+            ext->setValueNotifyingHost(0.0f);
+            listen->setValueNotifyingHost(0.0f);
+            bypass->setValueNotifyingHost(0.0f);
         }
         // Verify the real MINI/FULL UI transformation on the message thread.
         if(iteration==2) {

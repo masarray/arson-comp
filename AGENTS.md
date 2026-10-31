@@ -19,3 +19,9 @@
 - Default FULL 704x520, minimum 660x490; MINI remains 330 high. Do not increase default GUI size without measuring element collision and user workflow.
 - Header has no decorative separator rules. Only MODEL and PRESET need small captions; buttons self-label. Maintain >=4.5:1 contrast between static captions and their dark metal background, using the shared palette contract.
 - Inspect screenshots from compiled JUCE at default/minimum, MINI and SIDECHAIN; preserve readable controls, meters, telemetry, preset and APVTS bindings. GUI changes must never modify engine DSP or latency.
+
+## M5 original factory bank contract
+- New ArSonComp preset content, not a reproduction of FabFilter proprietary .ffp files/settings or proprietary DSP.
+- Catalog browser supports real categories/search/tags/description/favorites without consuming additional permanent GUI space.
+- Loading a factory program never changes External SC, Listen or Bypass; factory values are sanitized against the canonical parameter table.
+- UI favorites persistence is strictly on the message thread, never in DSP. Test every program for finite output, safe bounds and host parameter recall, plus browser screenshot.

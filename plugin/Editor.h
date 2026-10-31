@@ -1,5 +1,7 @@
 #pragma once
 #include "Processor.h"
+#include "FactoryPresetBank.h"
+#include <vector>
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <array>
 class CompLook final : public juce::LookAndFeel_V4 {
@@ -35,6 +37,37 @@ public:
     void mouseMove(const juce::MouseEvent&) override;
     void mouseEnter(const juce::MouseEvent&) override;
 private:
+    // Compact multi-category audition/search browser on the message thread.
+    // Owns only GUI state and a bounded factory index; never touches DSP.
+    class PresetBrowser final : public juce::Component,
+                                private juce::ListBoxModel,
+                                private juce::KeyListener {
+    public:
+        explicit PresetBrowser(Editor&);
+        ~PresetBrowser() override;
+        void paint(juce::Graphics&) override;
+        void resized() override;
+        void open();
+        int getNumRows() override;
+        void paintListBoxItem(int,juce::Graphics&,int,int,bool) override;
+        void selectedRowsChanged(int) override;
+        void listBoxItemDoubleClicked(int,const juce::MouseEvent&) override;
+        bool keyPressed(const juce::KeyPress&,juce::Component*) override;
+    private:
+        void rebuildFilter();
+        void showDetails();
+        void applySelected(bool closeAfter);
+        void persistFavorites() const;
+        Editor& owner;
+        juce::TextEditor search,detail;
+        juce::Label heading,subheading;
+        juce::ListBox resultList;
+        juce::TextButton favoritesOnly{"FAVORITES"},
+                         star{"STAR"},use{"APPLY"},close{"CLOSE"};
+        std::vector<int> matches;
+        std::vector<bool> favorites;
+        bool showOnlyFavorites=false;
+    };
     class GraphCanvas final : public juce::Component {
     public:
         explicit GraphCanvas(Editor& p) : owner(p) {
@@ -51,6 +84,7 @@ private:
     };
     void timerCallback() override;
     void applyPreset(int);
+    void openPresetBrowser();
     void setValue(std::size_t,float);
     void drawDisplay(juce::Graphics&);
     juce::Rectangle<float> plotBounds() const noexcept;
@@ -67,6 +101,7 @@ private:
     std::array<juce::Slider,arson::Detector> knobs;
     std::array<juce::Label,arson::Detector> labels;
     GraphCanvas graphCanvas{*this};
+    PresetBrowser presetBrowser{*this};
     juce::Label hoverReadout;
     std::size_t hoveredParameter=arson::Threshold;
     using SliderAttachment=juce::AudioProcessorValueTreeState::SliderAttachment;
