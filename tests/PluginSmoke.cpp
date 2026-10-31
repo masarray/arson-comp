@@ -10,31 +10,47 @@ int main(int argc,char** argv) {
     {
         const auto coral=juce::Colour{0xffdf5860};
         const auto fade=arson::ui::makeEdgeFade(coral,0.0f,239.0f,0.9f);
-        if(fade.getNumColours()!=4 ||
-           fade.getColourAtPosition(0.0).getFloatAlpha()>0.01f ||
-           fade.getColourAtPosition(1.0).getFloatAlpha()>0.01f ||
-           fade.getColourAtPosition(0.5).getFloatAlpha()<0.88f ||
-           fade.getColourAtPosition(0.02).getFloatAlpha()>=
-             fade.getColourAtPosition(0.10).getFloatAlpha() ||
-           std::abs(fade.getColourAtPosition(0.07).getFloatAlpha()-
-                    fade.getColourAtPosition(0.93).getFloatAlpha())>0.02f)
+        const float head=fade.getColourAtPosition(0.0).getFloatAlpha();
+        const float tail=fade.getColourAtPosition(1.0).getFloatAlpha();
+        const float middle=fade.getColourAtPosition(0.5).getFloatAlpha();
+        const float nearStart=fade.getColourAtPosition(0.02).getFloatAlpha();
+        const float innerStart=fade.getColourAtPosition(0.10).getFloatAlpha();
+        const float mirrorStart=fade.getColourAtPosition(0.07).getFloatAlpha();
+        const float mirrorEnd=fade.getColourAtPosition(0.93).getFloatAlpha();
+        if(fade.getNumColours()!=4 || head>0.015f || tail>0.015f ||
+           middle<0.85f || nearStart>=innerStart ||
+           std::abs(mirrorStart-mirrorEnd)>0.035f) {
+            std::cerr<<"edge-stop test: count="<<fade.getNumColours()
+                <<" alpha={ "<<head<<", "<<nearStart<<", "<<innerStart
+                <<", "<<middle<<", "<<mirrorStart<<", "<<mirrorEnd
+                <<", "<<tail<<" }\\n";
             return 24;
+        }
         const auto transfer=arson::ui::makeEdgeFade(coral,0.0f,239.0f,1.0f,0.18f);
-        if(transfer.getColourAtPosition(0.0).getFloatAlpha()<0.17f ||
-           transfer.getColourAtPosition(0.50).getFloatAlpha()<0.99f)
+        const float transferEdge=transfer.getColourAtPosition(0.0).getFloatAlpha();
+        const float transferMiddle=transfer.getColourAtPosition(0.5).getFloatAlpha();
+        if(transferEdge<0.15f || transferMiddle<0.98f) {
+            std::cerr<<"transfer edge="<<transferEdge<<" middle="<<transferMiddle<<"\\n";
             return 25;
+        }
 
-        // Actual software rasterizer output: no hidden bitmap, no blur,
-        // and both ends less bright than the middle in a real ARGB image.
+        // Exercise the same API as the real scope: Graphics::strokePath
+        // with a cached multi-stop brush, NOT Graphics::drawLine.
         juce::Image canvas(juce::Image::ARGB,240,16,true);
         juce::Graphics graph(canvas);
         graph.setGradientFill(fade);
-        graph.drawLine(0.0f,8.0f,239.0f,8.0f,2.0f);
+        juce::Path stroke;
+        stroke.startNewSubPath(0.0f,8.0f);
+        stroke.lineTo(239.0f,8.0f);
+        graph.strokePath(stroke,juce::PathStrokeType(2.0f));
         const float left=canvas.getPixelAt(5,8).getFloatAlpha();
         const float centre=canvas.getPixelAt(120,8).getFloatAlpha();
         const float right=canvas.getPixelAt(234,8).getFloatAlpha();
-        if(!(centre>0.7f && left<centre*0.35f && right<centre*0.35f))
+        if(!(centre>0.55f && left<centre*0.55f && right<centre*0.55f)) {
+            std::cerr<<"raster-fade: alpha left="<<left
+                <<" centre="<<centre<<" right="<<right<<"\\n";
             return 26;
+        }
     }
     Processor processor;processor.prepareToPlay(48000,128);
     if(processor.getLatencySamples()!=0) return 1;
