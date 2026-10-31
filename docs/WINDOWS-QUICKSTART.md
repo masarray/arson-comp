@@ -40,3 +40,7 @@ The current test build opens at 900×765 instead of 1120×760. Minimum resizable
 ### Two-sided dissolve, low-cost LED metering
 
 Use the Standalone EXE or VST3 from the **latest** matching Windows Actions artifact. With audio playing, confirm the red gain-reduction trace and gray input/output traces disappear gradually at **both ends** of the dynamics graph without abrupt vertical cutoffs, while remaining crisp in the middle. The curve marker and compressor settings must still work as before. Confirm meters decay smoothly and their unlit segments are visible at all levels. Graph rendering is GUI-only, with no lookahead or additional algorithmic audio samples. Measure CPU and crackles in your own host/driver at 32/64/128 sample buffers rather than treating CI synthetic numbers as real-device measurements.
+
+### Metal controls and decluttered header
+
+All primary knobs now mimic machined/brushed aluminium with a black recessed channel and a coral (not green) value sector. Hover or double-click any knob to discover its range/reset, or type a numerical value. Click **FILE** in the header to open Save/Open options for your .arsoncomp user presets; the previous separate SAVE/OPEN buttons are now intentionally removed. Switch the footer between **DYNAMICS** and **SIDECHAIN** for advanced detector filters and monitoring. Switching pages does not change or reset audio parameters. Compare all four screenshots (default, minimum, MINI, SIDECHAIN), then validate physically in Standalone or your VST3 host.

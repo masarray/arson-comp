@@ -25,3 +25,11 @@ The full reference GUI in commit f63e8c6 passed Windows/Linux CI, but user feedb
 The latest grouped GUI milestone applies symmetric horizontal transparency fades to input/output/GR history and keeps the transfer curve readable with a lower-opacity edge; cache the six gradient brushes and meter rails on resize. The new `GraphPaint.h` helper is GUI-only; numerical and ARGB rasterizer smoke asserts actual fades. Meter-active segments are rendered at 30Hz over pre-rendered inactive rails; do not recreate LED background rectangles every frame. There must be **no** DSP engine changes or new audio-thread visual work.
 
 Build and visually inspect 900x765 default, 860x700 minimum and MINI 380 screenshots in the Windows Actions artifact before distributing. Verify live rendering on the user's real Windows host/ASIO interface and DAW/ArSonMiX, check visual motion and actual CPU usage, channel independence, host automation, and session reopen. Running an editor smoke in CI does not replace a physical-device validation.
+
+## Hardware knob and progressive disclosure handoff
+
+The user supplied a concentric brushed-metal/black-groove rotary-knob image with a green indicator sector and asked for matching physical feel in the existing coral ArSonComp palette. Implementation: UI-only immutable face cache (regular + larger Threshold), concentric machined microtexture generated on size change, subtle metal rim and black inset ring, coral active groove and understated needle. Do **not** use the supplied source image as a runtime asset or perform high-cost graphics inside DSP callbacks.
+
+To address overcrowding, SAVE/OPEN are moved behind FILE (same async dialogs), header retains Model/Preset/A-B/Bypass/MINI; lower strip uses DYNAMICS vs SIDECHAIN views with all APVTS attachments still alive. Default DYNAMICS displays Range/Hold/Mix/Link/AUTO; SIDECHAIN displays HP/LP, Peak/RMS, External SC and Listen SC. Switching is UI-only. A new CI screenshot `ArSonComp-preview-sidechain.png` is captured at minimum size. Existing default/minimum/MINI screenshots persist. Inspect screenshots, verify text boxes and knobs align with labels, and no tab controls overlap. Validate in VST3/Standalone host, not solely GUI smoke.
+
+One grouped commit should produce one Linux/Windows CI run; keep PR draft until new CI and real device validation.

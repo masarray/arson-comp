@@ -118,18 +118,54 @@ int main(int argc,char** argv) {
         const auto* presets=editor->findChildWithID("view.presets");
         const auto* save=editor->findChildWithID("preset.save");
         const auto* load=editor->findChildWithID("preset.load");
+        const auto* file=editor->findChildWithID("view.file");
+        const auto* compare=editor->findChildWithID("view.compare");
+        const auto* bypass=editor->findChildWithID("view.bypass");
+        const auto* dynTab=editor->findChildWithID("view.dynamics.tab");
+        const auto* scTab=editor->findChildWithID("view.sidechain.tab");
+        const auto* range=editor->findChildWithID("param.range");
+        const auto* mix=editor->findChildWithID("param.mix");
         if(!hp||!lp||!detector||!autoMode||!external||!listen||
-           !style||!presets||!save||!load)return 21;
-        if(lp->getRight()>detector->getX() ||
-           detector->getBounds().intersects(autoMode->getBounds()) ||
-           external->getBounds().intersects(listen->getBounds()) ||
-           style->getBounds().intersects(presets->getBounds()) ||
-           presets->getBounds().intersects(save->getBounds()) ||
-           save->getBounds().intersects(load->getBounds()))return 22;
+           !style||!presets||!save||!load||!file||!compare||!bypass||
+           !dynTab||!scTab||!range||!mix)return 21;
+        // File controls are deliberately not mounted in the visible header.
+        // Both independent tab views must have unclipped, non-overlapping
+        // active controls at 860 and 900px.
+        if(save->isVisible()||load->isVisible()||
+           !dynTab->isVisible()||!scTab->isVisible()||
+           !range->isVisible()||!mix->isVisible()||!autoMode->isVisible()||
+           hp->isVisible()||lp->isVisible()||detector->isVisible()||
+           external->isVisible()||listen->isVisible())return 22;
+        if(style->getBounds().intersects(presets->getBounds()) ||
+           presets->getBounds().intersects(compare->getBounds()) ||
+           compare->getBounds().intersects(file->getBounds()) ||
+           file->getBounds().intersects(bypass->getBounds()) ||
+           range->getBounds().intersects(mix->getBounds()) ||
+           dynTab->getBounds().intersects(scTab->getBounds()) ||
+           autoMode->getBounds().intersects(mix->getBounds()))return 28;
         for(const auto* widget : {threshold,input,ratio,attack,hp,lp,detector,
-                                  autoMode,external,listen,style,presets,save,load}) {
+                                  autoMode,external,listen,style,presets,save,load,
+                                  file,compare,bypass,dynTab,scTab,range,mix}) {
+            if(!widget->isVisible())continue;
             if(widget->getX()<0 || widget->getRight()>editor->getWidth() ||
                widget->getY()<0 || widget->getBottom()>editor->getHeight())return 23;
+        }
+        if(iteration==1) {
+            auto* tab=dynamic_cast<juce::TextButton*>(
+                editor->findChildWithID("view.sidechain.tab"));
+            auto* mainTab=dynamic_cast<juce::TextButton*>(
+                editor->findChildWithID("view.dynamics.tab"));
+            if(!tab||!mainTab||!tab->onClick||!mainTab->onClick)return 29;
+            tab->onClick();
+            if(!hp->isVisible()||!lp->isVisible()||!detector->isVisible()||
+               !external->isVisible()||!listen->isVisible()||
+               range->isVisible()||mix->isVisible()||autoMode->isVisible()||
+               lp->getBounds().intersects(detector->getBounds())||
+               detector->getBounds().intersects(external->getBounds())||
+               external->getBounds().intersects(listen->getBounds()))return 30;
+            mainTab->onClick();
+            if(!range->isVisible()||hp->isVisible()||!autoMode->isVisible())
+                return 32;
         }
         editor->addToDesktop(0); editor->setVisible(true);
         for(int j=0;j<1500;++j) {
@@ -143,6 +179,24 @@ int main(int argc,char** argv) {
         if(iteration==0) {
             juce::Timer::callAfterDelay(120,[]{juce::MessageManager::getInstance()->stopDispatchLoop();});
             juce::MessageManager::getInstance()->runDispatchLoop();
+        }
+        if(iteration==1 && argc>1) {
+            // Use the populated signal history and active desktop renderer
+            // for a useful visual review of the Sidechain page.
+            auto* tab=dynamic_cast<juce::TextButton*>(
+                editor->findChildWithID("view.sidechain.tab"));
+            auto* mainTab=dynamic_cast<juce::TextButton*>(
+                editor->findChildWithID("view.dynamics.tab"));
+            if(!tab || !mainTab || !tab->onClick || !mainTab->onClick)return 29;
+            tab->onClick();
+            const auto picture=editor->createComponentSnapshot(editor->getLocalBounds());
+            juce::File fileName(juce::String::fromUTF8(argv[1]));
+            fileName=fileName.getSiblingFile(
+                fileName.getFileNameWithoutExtension()+"-sidechain.png");
+            auto stream=fileName.createOutputStream();
+            if(!stream || !juce::PNGImageFormat{}.writeImageToStream(picture,*stream))
+                return 31;
+            mainTab->onClick();
         }
         // Verify the real MINI/FULL UI transformation on the message thread.
         if(iteration==2) {

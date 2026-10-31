@@ -57,43 +57,89 @@ juce::Label* CompLook::createSliderTextBox(juce::Slider& s) {
     label->setColour(juce::TextEditor::focusedOutlineColourId,accent);
     return label;
 }
+const juce::Image& CompLook::knobFace(int diameter,bool primary) {
+    auto& slot=faces[primary?1:0];
+    if(slot.pixels==diameter && slot.face.isValid())return slot.face;
+    slot.pixels=diameter;
+    slot.face=juce::Image(juce::Image::ARGB,diameter,diameter,true);
+    {
+        juce::Graphics g(slot.face);
+        const float d=static_cast<float>(diameter),cx=d*0.5f,cy=d*0.5f;
+        const float outer=d*0.5f-2.5f;
+        // A machined outer metal lip and matte-black channel.
+        g.setColour(juce::Colours::black.withAlpha(0.55f));
+        g.fillEllipse(cx-outer-1.0f,cy-outer+1.0f,2*outer+2,2*outer+2);
+        g.setGradientFill(juce::ColourGradient(juce::Colour{0xff898b8c},
+            cx-outer*0.65f,cy-outer,
+            juce::Colour{0xff292b2e},cx+outer*0.65f,cy+outer,false));
+        g.fillEllipse(cx-outer,cy-outer,2*outer,2*outer);
+        g.setColour(juce::Colour{0xffc0c1c0}.withAlpha(0.32f));
+        g.drawEllipse(cx-outer+0.8f,cy-outer+0.8f,2*outer-1.6f,2*outer-1.6f,0.75f);
+        const float channel=outer-3.5f;
+        g.setColour(juce::Colour{0xff07090b});
+        g.fillEllipse(cx-channel,cy-channel,2*channel,2*channel);
+        g.setColour(juce::Colour{0xff66676b}.withAlpha(0.33f));
+        g.drawEllipse(cx-channel+1.3f,cy-channel+1.3f,
+                      2*channel-2.6f,2*channel-2.6f,0.75f);
+
+        // Brushed aluminium face, generated once per geometric size.
+        const float faceRadius=channel-6.5f;
+        g.setGradientFill(juce::ColourGradient(juce::Colour{0xff696b6c},
+            cx-faceRadius*0.60f,cy-faceRadius*0.85f,
+            juce::Colour{0xff383b3e},cx+faceRadius*0.85f,cy+faceRadius*0.85f,false));
+        g.fillEllipse(cx-faceRadius,cy-faceRadius,2*faceRadius,2*faceRadius);
+        g.setGradientFill(juce::ColourGradient(juce::Colour{0xffd3d5d3}.withAlpha(0.24f),
+            cx-faceRadius*0.45f,cy-faceRadius*0.50f,
+            juce::Colours::transparentBlack,cx+faceRadius*0.70f,cy+faceRadius*0.75f,true));
+        g.fillEllipse(cx-faceRadius,cy-faceRadius,2*faceRadius,2*faceRadius);
+        // Micro-concentric machining pattern is deliberately subtle:
+        // a pre-baked 70-circle overlay, never 70 draw calls per UI frame.
+        for(int i=0;i<72;++i) {
+            const float t=(i+1.0f)/73.0f;
+            const float r=faceRadius*(0.07f+0.92f*t);
+            g.setColour(i%3==0?juce::Colours::white.withAlpha(0.052f)
+                             :juce::Colours::black.withAlpha(0.043f));
+            g.drawEllipse(cx-r,cy-r,r*2,r*2,0.50f);
+        }
+        g.setColour(juce::Colour{0xffafb0b0}.withAlpha(0.38f));
+        g.drawEllipse(cx-faceRadius,cy-faceRadius,2*faceRadius,2*faceRadius,0.85f);
+    } // flush JUCE Graphics before sampling/drawing cached Image
+    return slot.face;
+}
 void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float start,float end,juce::Slider& slider) {
     const bool primary=slider.getName()=="Threshold";
-    const float radiusScale=primary?0.47f:0.36f;
-    const float r=std::max(12.0f,std::min(static_cast<float>(w)*radiusScale,
-        static_cast<float>(h)*(primary?0.47f:0.36f)));
-    const float cx=static_cast<float>(x)+w*0.5f,cy=static_cast<float>(y)+h*0.51f;
-    g.setColour(juce::Colours::black.withAlpha(0.62f));
-    g.fillEllipse(cx-r-3.0f,cy-r-1.0f,2*r+6.0f,2*r+6.0f);
-    g.setColour(juce::Colour{0xff3e4147});
-    g.fillEllipse(cx-r,cy-r,2*r,2*r);
-    const float ringInset=primary?6.8f:5.0f;
-    const float rr=r-ringInset;
-    g.setGradientFill(juce::ColourGradient(juce::Colour{0xff363a40},
-        cx-rr*0.65f,cy-rr*0.9f,juce::Colour{0xff0b0e11},
-        cx+rr*0.85f,cy+rr*0.95f,true));
-    g.fillEllipse(cx-rr,cy-rr,2*rr,2*rr);
-    g.setColour(juce::Colour{0xff15191d}.withAlpha(0.8f));
-    g.drawEllipse(cx-rr+2.0f,cy-rr+2.0f,2*rr-4.0f,2*rr-4.0f,1.2f);
-    juce::Path inactive,active;
-    const float arcR=r+1.6f;
-    inactive.addCentredArc(cx,cy,arcR,arcR,0.0f,start,end,true);
-    active.addCentredArc(cx,cy,arcR,arcR,0.0f,start,start+clamp01(pos)*(end-start),true);
-    g.setColour(juce::Colour{0xff43494f});
-    g.strokePath(inactive,juce::PathStrokeType(primary?4.8f:4.0f,
+    const float r=std::max(13.0f,std::min(
+        static_cast<float>(w)*(primary?0.455f:0.395f),
+        static_cast<float>(h)*(primary?0.455f:0.395f)));
+    const int pixels=juce::jmax(28,static_cast<int>(std::ceil(r*2.0f+7.0f)));
+    const float cx=x+w*0.5f,cy=y+h*0.48f;
+    const auto& face=knobFace(pixels,primary);
+    g.drawImageAt(face,juce::roundToInt(cx-pixels*0.5f),
+                       juce::roundToInt(cy-pixels*0.5f));
+    // Active arc lies inside the dark metal groove in the reference,
+    // with no thick neon ring floating outside the physical control.
+    const float groove=r-4.7f;
+    const float valueAngle=start+clamp01(pos)*(end-start);
+    juce::Path activity;
+    activity.addCentredArc(cx,cy,groove,groove,0.0f,start,valueAngle,true);
+    g.setColour(accent.withAlpha(0.23f));
+    g.strokePath(activity,juce::PathStrokeType(6.0f,
         juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
-    g.setColour(accent);
-    g.strokePath(active,juce::PathStrokeType(primary?5.4f:4.3f,
+    g.setColour(accentBright.withAlpha(0.95f));
+    g.strokePath(activity,juce::PathStrokeType(primary?4.1f:3.5f,
         juce::PathStrokeType::curved,juce::PathStrokeType::rounded));
-    const float theta=start+clamp01(pos)*(end-start);
-    g.setColour(juce::Colour{0xfffff5f5});
-    g.drawLine(cx+std::sin(theta)*rr*0.27f,cy-std::cos(theta)*rr*0.27f,
-               cx+std::sin(theta)*rr*0.78f,cy-std::cos(theta)*rr*0.78f,
-               primary?2.7f:2.1f);
-    g.setColour(juce::Colour{0xff6d7278});
-    g.fillEllipse(cx-1.5f,cy-1.5f,3.0f,3.0f);
+    // On-face calibrated needle. Small and restrained.
+    const float faceRadius=r-14.5f;
+    g.setColour(juce::Colour{0xfff1f0ed}.withAlpha(0.9f));
+    g.drawLine(cx+std::sin(valueAngle)*faceRadius*0.37f,
+               cy-std::cos(valueAngle)*faceRadius*0.37f,
+               cx+std::sin(valueAngle)*faceRadius*0.73f,
+               cy-std::cos(valueAngle)*faceRadius*0.73f,1.65f);
+    g.setColour(juce::Colour{0xffd0cfcd}.withAlpha(0.55f));
+    g.fillEllipse(cx-1.4f,cy-1.4f,2.8f,2.8f);
 }
+
 void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float,float,
                                  const juce::Slider::SliderStyle,juce::Slider&) {
@@ -179,7 +225,7 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
         addAndMakeVisible(k);
         attachments[i]=std::make_unique<SliderAttachment>(p.state,spec.id,k);
     }
-    style.addItemList({"Clean - feedforward","Feedback - classic","Smooth - dual envelope"},1);
+    style.addItemList({"Clean","Feedback","Smooth"},1);
     style.setComponentID("view.model");
     style.setTooltip("Three independent zero-added-sample-latency compressor models.");
     addAndMakeVisible(style);
@@ -212,6 +258,8 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     autoRelease.setTooltip("Auto Release - adapts recovery time to signal activity.");
     external.setTooltip("External Sidechain - routes the host's auxiliary detector bus.");
     listen.setTooltip("Listen Sidechain - audition the filtered detector signal.");
+    compare.setComponentID("view.compare");
+    bypass.setComponentID("view.bypass");
     compare.setTooltip("A/B snapshots apply to actual host parameters.");
     compare.onClick=[this] {
         const auto current=processor.snapshot();
@@ -273,8 +321,35 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
                 }
             });
     };
-    addAndMakeVisible(savePreset);
-    addAndMakeVisible(loadPreset);
+    // Preset file operations stay accessible through one small FILE menu.
+    // Legacy controls remain attached for host-independent smoke tests,
+    // but are not painted in the crowded toolbar.
+    addChildComponent(savePreset);
+    addChildComponent(loadPreset);
+    fileMenu.setComponentID("view.file");
+    fileMenu.setTooltip("User presets: save current settings or open a .arsoncomp preset.");
+    fileMenu.onClick=[this] {
+        juce::PopupMenu menu;
+        menu.addItem(1,"Save preset...");
+        menu.addItem(2,"Open preset...");
+        juce::Component::SafePointer<Editor> safe(this);
+        menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&fileMenu),
+            [safe](int item) {
+                if(auto* editor=safe.getComponent()) {
+                    if(item==1 && editor->savePreset.onClick)editor->savePreset.onClick();
+                    else if(item==2 && editor->loadPreset.onClick)editor->loadPreset.onClick();
+                }
+            });
+    };
+    addAndMakeVisible(fileMenu);
+    dynamicsTab.setComponentID("view.dynamics.tab");
+    sidechainTab.setComponentID("view.sidechain.tab");
+    dynamicsTab.setTooltip("Range, Hold, Mix, Link and Auto Release.");
+    sidechainTab.setTooltip("Sidechain detector mode, HP/LP filters, external routing and audition.");
+    dynamicsTab.onClick=[this]{sidechainPanel=false;syncPanelVisibility();};
+    sidechainTab.onClick=[this]{sidechainPanel=true;syncPanelVisibility();};
+    addAndMakeVisible(dynamicsTab);
+    addAndMakeVisible(sidechainTab);
     compact.setComponentID("view.compact");
     compact.setTooltip("MINI shows hardware controls and horizontal stereo meters.");
     compact.onClick=[this] {
@@ -298,6 +373,7 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     setResizable(true,true);
     setResizeLimits(860,700,1200,965);
     setSize(900,765);
+    syncPanelVisibility();
     startTimerHz(30);
 }
 Editor::~Editor() {
@@ -343,17 +419,39 @@ juce::Rectangle<float> Editor::plotBounds() const noexcept {
         static_cast<float>(display.getWidth()-206),
         static_cast<float>(display.getHeight()-60)};
 }
+void Editor::syncPanelVisibility() {
+    constexpr std::array<std::size_t,4> mainControls{
+        arson::Range,arson::Hold,arson::Mix,arson::Link};
+    constexpr std::array<std::size_t,2> sideControls{
+        arson::Highpass,arson::Lowpass};
+    for(auto i:mainControls) {
+        knobs[i].setVisible(!sidechainPanel);
+        labels[i].setVisible(!sidechainPanel);
+    }
+    for(auto i:sideControls) {
+        knobs[i].setVisible(sidechainPanel);
+        labels[i].setVisible(sidechainPanel);
+    }
+    autoRelease.setVisible(!sidechainPanel);
+    detector.setVisible(sidechainPanel);
+    external.setVisible(sidechainPanel);
+    listen.setVisible(sidechainPanel);
+    dynamicsTab.setColour(juce::TextButton::buttonColourId,
+        sidechainPanel?juce::Colour{0xff1b2025}:juce::Colour{0xff413037});
+    sidechainTab.setColour(juce::TextButton::buttonColourId,
+        sidechainPanel?juce::Colour{0xff413037}:juce::Colour{0xff1b2025});
+    repaint(0,compactMode?194:getHeight()-130,getWidth(),125);
+}
 void Editor::resized() {
     const int w=getWidth(),h=getHeight();
-    // Narrow portrait-weight layout: fixed utility budget + elastic control cells.
-    // No label or toggle is allowed to overlap its neighbor at minimum size.
-    compact.setBounds(166,23,47,28);
-    style.setBounds(220,22,146,29);
-    presets.setBounds(w-467,22,151,29);
-    savePreset.setBounds(w-308,22,47,29);
-    loadPreset.setBounds(w-257,22,47,29);
-    compare.setBounds(w-206,22,64,29);
-    bypass.setBounds(w-135,23,122,27);
+    // The utility menu replaces two permanent buttons. Presets and model
+    // have measurable reserved space at both 860 and 900 pixel layouts.
+    compact.setBounds(166,21,45,28);
+    style.setBounds(218,20,145,30);
+    presets.setBounds(375,20,w-640,30);
+    compare.setBounds(w-257,20,49,30);
+    fileMenu.setBounds(w-200,20,57,30);
+    bypass.setBounds(w-135,21,120,28);
     display=compactMode?juce::Rectangle<int>{}:
         juce::Rectangle<int>{8,73,w-16,h-333};
     const int mainY=compactMode?68:display.getBottom()+8;
@@ -365,24 +463,36 @@ void Editor::resized() {
         labels[i].setBounds(x,mainY+3,cell,17);
         knobs[i].setBounds(x+3,mainY+20,cell-6,105);
     }
-    const int bottomY=compactMode?202:h-119;
-    const int small=(w-245)/6;
-    constexpr std::array<std::size_t,6> secondary{arson::Range,arson::Hold,
-        arson::Mix,arson::Link,arson::Highpass,arson::Lowpass};
-    for(std::size_t k=0;k<secondary.size();++k) {
-        const auto i=secondary[k];const int x=14+static_cast<int>(k)*small;
-        labels[i].setBounds(x,bottomY+1,small,16);
-        knobs[i].setBounds(x+6,bottomY+18,small-12,55);
+
+    const int bottomY=compactMode?198:h-126;
+    dynamicsTab.setBounds(16,bottomY+1,92,23);
+    sidechainTab.setBounds(114,bottomY+1,94,23);
+    // Main tab: four comfortable controls, plus a dedicated AUTO control.
+    const int slot=(w-190)/4;
+    constexpr std::array<std::size_t,4> dynamics{arson::Range,arson::Hold,
+        arson::Mix,arson::Link};
+    for(std::size_t k=0;k<dynamics.size();++k) {
+        const auto i=dynamics[k];const int x=16+static_cast<int>(k)*slot;
+        labels[i].setBounds(x,bottomY+26,slot-10,16);
+        knobs[i].setBounds(x+5,bottomY+44,slot-18,50);
     }
-    const int opts=w-220;
-    detector.setBounds(opts,bottomY+1,84,26);
-    autoRelease.setBounds(opts+90,bottomY+1,112,26);
-    external.setBounds(opts,bottomY+37,94,24);
-    listen.setBounds(opts+102,bottomY+37,100,24);
+    autoRelease.setBounds(w-153,bottomY+44,139,27);
+
+    // Sidechain tab: only detector-specific controls are painted.
+    constexpr std::array<std::size_t,2> filters{arson::Highpass,arson::Lowpass};
+    for(std::size_t k=0;k<filters.size();++k) {
+        const auto i=filters[k];const int x=17+static_cast<int>(k)*194;
+        labels[i].setBounds(x,bottomY+26,181,16);
+        knobs[i].setBounds(x+5,bottomY+44,170,50);
+    }
+    detector.setBounds(423,bottomY+47,104,27);
+    external.setBounds(550,bottomY+46,112,28);
+    listen.setBounds(684,bottomY+46,105,28);
+    // Old file buttons are intentionally non-visible.
+    savePreset.setBounds(0,0,0,0);
+    loadPreset.setBounds(0,0,0,0);
     if(compactMode){grid=juce::Image();return;}
 
-    // This cache owns only immutable decoration. Animated history paths are
-    // separate message-thread caches rebuilt on new telemetry, not paint().
     cachedCurveWidth=-1;
     grid=juce::Image(juce::Image::RGB,display.getWidth(),display.getHeight(),true);
     juce::Graphics g(grid);
@@ -416,8 +526,6 @@ void Editor::resized() {
     g.setColour(juce::Colour{0xff454b50}.withAlpha(0.75f));
     g.drawVerticalLine(static_cast<int>(left)-45,18.0f,height-20.0f);
     g.drawVerticalLine(static_cast<int>(right)+12,18.0f,height-20.0f);
-    // Fully reusable gradient stops; preserve transfer readability at
-    // near-silent endpoints while moving traces dissolve to transparent.
     const float x0=plot.getX(),x1=plot.getRight();
     edgeFades[0]=arson::ui::makeEdgeFade(juce::Colours::white,x0,x1,0.19f);
     edgeFades[1]=arson::ui::makeEdgeFade(juce::Colour{0xffd8d9d8},x0,x1,0.52f);
@@ -425,8 +533,6 @@ void Editor::resized() {
     edgeFades[3]=arson::ui::makeEdgeFade(accentBright,x0,x1,0.97f,0.18f);
     edgeFades[4]=arson::ui::makeEdgeFade(accent,x0,x1,0.14f,0.10f);
     edgeFades[5]=arson::ui::makeEdgeFade(accent,x0,x1,0.105f);
-    // Pre-rasterize inactive LED rails once with grid; runtime paints
-    // active segments only, avoiding ~230 inactive rect draws per frame.
     arson::ui::paintMeterRail(g,{14.0f,plot.getY(),33.0f,plot.getHeight()},false);
     arson::ui::paintMeterRail(g,{width-110.0f,plot.getY(),34.0f,plot.getHeight()},true);
     arson::ui::paintMeterRail(g,{width-61.0f,plot.getY(),42.0f,plot.getHeight()},false);
@@ -525,48 +631,51 @@ void Editor::rebuildHistoryPaths() {
 void Editor::paint(juce::Graphics& g) {
     g.fillAll(bg);
     g.setGradientFill(juce::ColourGradient(juce::Colour{0xff202528},
-        0.0f,0.0f,bg,0.0f,69.0f,false));
+        0.0f,0.0f,bg,0.0f,68.0f,false));
     g.fillRect(0,0,getWidth(),68);
-    g.setColour(line.withAlpha(0.67f));
-    g.drawHorizontalLine(68,0.0f,static_cast<float>(getWidth()));
-    g.setFont(juce::FontOptions(20.5f));
+    g.setColour(line.withAlpha(0.58f));
+    g.drawHorizontalLine(67,0.0f,static_cast<float>(getWidth()));
+    g.setFont(juce::FontOptions(19.6f));
     g.setColour(text);
-    g.drawText("ArSon",16,11,81,29,juce::Justification::centredLeft);
+    g.drawText("ArSon",16,11,81,28,juce::Justification::centredLeft);
     g.setColour(accent);
-    g.drawText("Comp",89,11,71,29,juce::Justification::centredLeft);
-    g.fillRoundedRectangle(16.0f,49.0f,42.0f,2.0f,1.0f);
-    g.setColour(muted.withAlpha(0.86f));
-    g.setFont(juce::FontOptions(8.7f));
-    g.drawText("LIVE DYNAMICS",67,46,99,16,juce::Justification::centredLeft);
-    g.drawText("MODEL",221,5,90,16,juce::Justification::left);
-    g.drawText("PRESET",getWidth()-466,5,140,16,juce::Justification::left);
+    g.drawText("Comp",88,11,71,28,juce::Justification::centredLeft);
+    g.fillRoundedRectangle(17.0f,49.0f,37.0f,2.0f,1.0f);
+    g.setColour(muted.withAlpha(0.67f));
+    g.setFont(juce::FontOptions(9.0f));
+    g.drawText("MODEL",219,5,84,13,juce::Justification::left);
+    g.drawText("PRESET",376,5,88,13,juce::Justification::left);
+
     const int mainY=compactMode?68:display.getBottom()+8;
     g.setGradientFill(juce::ColourGradient(juce::Colour{0xff1b2023},
-        0.0f,static_cast<float>(mainY),bg,0.0f,static_cast<float>(mainY+141),false));
+        0.0f,static_cast<float>(mainY),bg,0.0f,static_cast<float>(mainY+134),false));
     g.fillRect(8,mainY,getWidth()-16,132);
-    g.setColour(line.withAlpha(0.58f));
+    g.setColour(line.withAlpha(0.45f));
     g.drawHorizontalLine(mainY,12.0f,static_cast<float>(getWidth()-12));
-    g.drawHorizontalLine(compactMode?198:getHeight()-123,
-        12.0f,static_cast<float>(getWidth()-12));
+    const int bottomY=compactMode?198:getHeight()-126;
+    g.drawHorizontalLine(bottomY,12.0f,static_cast<float>(getWidth()-12));
+    // One subtle hairline per channel strip; no boxed, noisy borders.
     const int cell=(getWidth()-28)/7;
     for(int i=1;i<7;++i) {
         const float x=14.0f+static_cast<float>(i*cell);
-        g.setColour(line.withAlpha(0.16f));
-        g.drawVerticalLine(static_cast<int>(x),static_cast<float>(mainY+16),
-            static_cast<float>(mainY+117));
+        g.setColour(line.withAlpha(0.105f));
+        g.drawVerticalLine(static_cast<int>(x),static_cast<float>(mainY+18),
+                           static_cast<float>(mainY+120));
     }
+    // Tab accent sits under its single current selection only.
+    g.setColour(accent.withAlpha(0.68f));
+    g.fillRoundedRectangle(sidechainPanel?115.0f:17.0f,
+        static_cast<float>(bottomY+22),sidechainPanel?91.0f:88.0f,1.8f,1.0f);
     if(!compactMode) {
         if(grid.isValid())g.drawImageAt(grid,display.getX(),display.getY());
-        g.setColour(juce::Colour{0xff555d60}.withAlpha(0.62f));
+        g.setColour(juce::Colour{0xff555d60}.withAlpha(0.55f));
         g.drawRoundedRectangle(display.toFloat(),5.0f,0.8f);
         drawDisplay(g);
     } else paintCompactMeters(g);
-    g.setColour(muted.withAlpha(0.67f));
+    g.setColour(muted.withAlpha(0.56f));
     g.setFont(juce::FontOptions(9.0f));
-    g.drawText("0 SAMPLES ADDED   /   VST3",14,getHeight()-19,250,15,
-        juce::Justification::left);
-    g.drawText("Drag / double-click reset / type exact values",
-        getWidth()-313,getHeight()-19,299,15,juce::Justification::centredRight);
+    g.drawText("0 SAMPLES ADDED  /  REALTIME DSP",
+        14,getHeight()-18,290,14,juce::Justification::left);
 }
 void Editor::refreshTransfer(const arson::Parameters& p,juce::Rectangle<float> plot) {
     const std::array<float,4> key{{p[arson::Threshold],p[arson::Ratio],

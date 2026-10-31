@@ -1,6 +1,7 @@
 #pragma once
 #include "Processor.h"
 #include <juce_gui_extra/juce_gui_extra.h>
+#include <array>
 class CompLook final : public juce::LookAndFeel_V4 {
 public:
     CompLook();
@@ -10,6 +11,10 @@ public:
                           const juce::Slider::SliderStyle,juce::Slider&) override;
     void drawToggleButton(juce::Graphics&,juce::ToggleButton&,bool,bool) override;
     void drawTooltip(juce::Graphics&,const juce::String&,int,int) override;
+private:
+    struct FaceCache { int pixels=0; juce::Image face; };
+    std::array<FaceCache,2> faces; // normal + oversized Threshold only
+    const juce::Image& knobFace(int diameter,bool primary);
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {
 public:
@@ -32,6 +37,7 @@ private:
                    const juce::String&,bool);
     void paintCompactMeters(juce::Graphics&);
     void rebuildHistoryPaths();
+    void syncPanelVisibility();
     Processor& processor;
     CompLook look;
     juce::TooltipWindow tooltip{this,650};
@@ -41,14 +47,15 @@ private:
     using ButtonAttachment=juce::AudioProcessorValueTreeState::ButtonAttachment;
     std::array<std::unique_ptr<SliderAttachment>,arson::Detector> attachments;
     juce::ComboBox presets,detector,style;
-    juce::TextButton compare{"A / B"},compact{"MINI"},savePreset{"SAVE"},loadPreset{"OPEN"};
+    juce::TextButton compare{"A/B"},compact{"MINI"},savePreset{"SAVE"},loadPreset{"OPEN"};
+    juce::TextButton fileMenu{"FILE"},dynamicsTab{"DYNAMICS"},sidechainTab{"SIDECHAIN"};
     juce::ToggleButton autoRelease{"Auto release"},external{"External SC"},listen{"Listen SC"},bypass{"Bypass"};
     std::array<std::unique_ptr<ButtonAttachment>,4> buttons;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> detectorAttachment,styleAttachment;
     std::unique_ptr<juce::FileChooser> presetChooser;
     arson::Parameters alternate, presetSnapshot;
     bool alternateActive=false;
-    bool compactMode=false,thresholdDragging=false;
+    bool compactMode=false,thresholdDragging=false,sidechainPanel=false;
     int expandedWidth=900,expandedHeight=765;
     std::array<arson::MeterFrame,400> history{};
     std::size_t head=0;

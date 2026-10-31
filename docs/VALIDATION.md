@@ -37,3 +37,11 @@ Verify default 1120x760, minimum 960x670 and compact 380px Windows screenshot ge
 - Assert full/minimum/MINI editor snapshots, preset save/reload, automation ID stability, no overlap and independent stereo metering via existing tests.
 - Static segmented meter rails cached in resized image; repaint draws **only active** segments plus labels/values. Confirm no off-bars ghosting with host running then stopping and resizing.
 - No engine changes: existing Linux sanitizer suite proves zero additional DSP samples, bounded SPSC and no audio-thread allocation. Pending real-device CPU/latency/pluginval and 150% DPI.
+
+## Brushed-metal knob and control-page validation
+
+- Actual Windows screenshot, 900×765 and 860×700: check metallic beveled ring and subtle fine machined concentric grain, coral arc in recessed groove, legible indicator and editable text values. Confirm enlarged Threshold does not collide with Ratio/Release. Ensure no fake skeuomorphic gradients/glows dominate readability.
+- Verify FILE button opens Save/Open actions, .arsoncomp roundtrip remains valid and A/B/bypass remain visible. Hidden SAVE/OPEN controls must not render, but their callbacks remain functional through FILE.
+- Verify default DYNAMICS page shows Range, Hold, Mix, Link and AUTO and hides detector/HP/LP/EXT/LISTEN. Switch to SIDECHAIN and verify complementary visibility plus zero overlap, then restore; repeat at min 860×700 and MINI 380px.
+- CI emits a fourth SIDECHAIN screenshot, additional to default/minimum/MINI; use screenshot review to identify any actual clipping. Knob cache is allocated only on GUI thread, at most once per changed diameter per role; all animation/LED metering remains unchanged.
+- Pro-C-grade DSP parity, pluginval, multi-instance real CPU, host automation reliability and hardware 32/64/128 sample tests remain release gates.
