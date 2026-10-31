@@ -7,13 +7,15 @@ namespace arson::ui {
 // Keep actual controls comfortably sized; remove blank canvas before scaling
 // text/knobs down. Reused by the editor renderer and the Windows smoke tests.
 struct EditorMetrics {
-    static constexpr int minWidth=660, minHeight=490;
-    static constexpr int defaultWidth=704, defaultHeight=520;
-    static constexpr int maxWidth=1040, maxHeight=780;
-    static constexpr int miniHeight=330; // preserve MINI meter readability
+    // Dense-but-usable hardware UI: 612px default instead of 704px.
+    // Main knobs keep a 62px drawing/drag target and readable 11px captions.
+    static constexpr int minWidth=580, minHeight=480;
+    static constexpr int defaultWidth=612, defaultHeight=500;
+    static constexpr int maxWidth=1000, maxHeight=760;
+    static constexpr int miniHeight=320;
     static constexpr int headerHeight=62, displayTop=64;
-    static constexpr int displayBottomReserve=260;
-    static constexpr int bottomControlsReserve=92;
+    static constexpr int displayBottomReserve=254;
+    static constexpr int bottomControlsReserve=86;
     static constexpr juce::uint32 captionRgb=0xffd9e0e3;
     static constexpr juce::uint32 controlCaptionRgb=0xffe4e9ec;
     static constexpr juce::uint32 headerBackgroundRgb=0xff292d30;
@@ -24,19 +26,21 @@ struct HeaderLayout {
     juce::Rectangle<int> logo,mini,model,preset,compare,file,bypass;
 
     static HeaderLayout calculate(int width) noexcept {
-        constexpr int inset=12,gap=8;
-        constexpr int logoW=126,miniW=42,modelW=96,compareW=40,fileW=44,bypassW=110;
+        // One-row responsive grid with a compact logo and right-anchored
+        // actions, so long preset names remain accessible via the browser.
+        constexpr int inset=10,gap=6;
+        constexpr int logoW=88,miniW=50,modelW=86;
+        constexpr int compareW=38,fileW=38,bypassW=100;
         constexpr int fixed=logoW+miniW+modelW+compareW+fileW+bypassW;
         const int available=width-2*inset-6*gap-fixed;
-        const int presetW=juce::jlimit(124,154,available);
+        const int presetW=juce::jlimit(124,148,available);
         constexpr int top=22,height=27;
         HeaderLayout h;
         int x=inset;
-        h.logo={x,17,logoW,29};x+=logoW+gap;
+        h.logo={x,17,logoW,28};x+=logoW+gap;
         h.mini={x,top,miniW,height};x+=miniW+gap;
         h.model={x,top,modelW,height};x+=modelW+gap;
         h.preset={x,top,presetW,height};
-        // Reserve the right actions; extra width becomes breathing room.
         h.bypass={width-inset-bypassW,top,bypassW,height};
         h.file={h.bypass.getX()-gap-fileW,top,fileW,height};
         h.compare={h.file.getX()-gap-compareW,top,compareW,height};

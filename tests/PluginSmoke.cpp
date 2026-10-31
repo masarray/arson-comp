@@ -2,6 +2,7 @@
 #include "../plugin/Editor.h"
 #include "../plugin/HeaderLayout.h"
 #include "../plugin/PresetIO.h"
+#include "../plugin/FactoryPresetBank.h"
 #include "../plugin/GraphPaint.h"
 #include "../plugin/SurfacePaint.h"
 #include "BinaryData.h"
@@ -11,7 +12,9 @@
 #include <initializer_list>
 #include <cmath>
 #include <algorithm>
-int main(int argc,char** argv) {
+#include <set>
+#include <string>
+static int runSmoke(int argc,char** argv) {
     juce::ScopedJuceInitialiser_GUI gui;
 #if JUCE_WINDOWS
     // The standalone must offer native low-latency ASIO (e.g. Maono PS22)
@@ -386,6 +389,59 @@ int main(int argc,char** argv) {
             return 51;
         }
     }
+    // All 46 original factory programs: unique IDs, safe bounds, finite DSP.
+    {
+        const auto& bank=arson::preset::factoryBank();
+        if(bank.size()!=46)return 73;
+        std::set<std::string> ids,categories;
+        for(const auto& entry:bank) {
+            if(!ids.insert(entry.id).second || !entry.category[0] ||
+               !entry.name[0] || !entry.description[0])return 74;
+            categories.insert(entry.category);
+            auto normalized=entry.settings;
+            normalized.sanitize();
+            if(normalized.value!=entry.settings.value ||
+               entry.settings[arson::External]!=0 ||
+               entry.settings[arson::Listen]!=0 ||
+               entry.settings[arson::Bypass]!=0)return 75;
+            if(arson::preset::findFactoryId(entry.id)<0)return 76;
+            // Factory compensation must be positive, effective and bounded.
+            if(entry.settings[arson::Makeup]<0.84f ||
+               entry.settings[arson::Makeup]>8.01f ||
+               arson::reduction(-12.0f,entry.settings[arson::Threshold],
+                   entry.settings[arson::Ratio],entry.settings[arson::Knee],
+                   entry.settings[arson::Range])<0.25f)return 82;
+            {
+                arson::Compressor calibrated;
+                calibrated.prepare(48000.0,entry.settings);
+                std::array<float,128> testL{},testR{};
+                float* ab[]{testL.data(),testR.data()};
+                float peak=0.0f;
+                for(int block=0;block<80;++block) {
+                    for(int i=0;i<128;++i) {
+                        testL[i]=0.18f*std::sin((block*128+i)*0.051f);
+                        testR[i]=0.14f*std::cos((block*128+i)*0.073f);
+                    }
+                    calibrated.process(ab,2,128);
+                    for(int i=0;i<128;++i)
+                        peak=std::max(peak,std::max(std::abs(testL[i]),std::abs(testR[i])));
+                }
+                if(!std::isfinite(peak) || peak>0.95f)return 83;
+            }
+            arson::Compressor engine;
+            engine.prepare(48000.0,entry.settings);
+            std::array<float,128> left{},right{};
+            for(int i=0;i<128;++i) {
+                left[i]=0.34f*std::sin(i*0.091f);
+                right[i]=0.22f*std::cos(i*0.11f);
+            }
+            float* audio[]{left.data(),right.data()};
+            engine.process(audio,2,128);
+            for(int i=0;i<128;++i)
+                if(!std::isfinite(left[i])||!std::isfinite(right[i]))return 77;
+        }
+        if(categories.size()!=10)return 78;
+    }
     Processor processor;processor.prepareToPlay(48000,128);
     if(processor.getLatencySamples()!=0) return 1;
     auto* parameter=processor.state.getParameter("threshold");parameter->setValueNotifyingHost(parameter->convertTo0to1(-27));
@@ -433,15 +489,15 @@ int main(int argc,char** argv) {
             return 66;
     }
     // Header invariants for minimum, default, legacy and maximum widths.
-    for(const int width : {660,704,780,1040}) {
+    for(const int width : {580,612,704,1000}) {
         const auto h=arson::ui::HeaderLayout::calculate(width);
         const std::array<juce::Rectangle<int>,7> fields{
             h.logo,h.mini,h.model,h.preset,h.compare,h.file,h.bypass};
-        if(h.preset.getWidth()<124||h.preset.getWidth()>154||
-           h.bypass.getRight()!=width-12||h.logo.getX()!=12)return 62;
+        if(h.preset.getWidth()<124||h.preset.getWidth()>148||
+           h.bypass.getRight()!=width-10||h.logo.getX()!=10)return 62;
         for(std::size_t i=1;i<fields.size();++i) {
-            if(fields[i].getX()-fields[i-1].getRight()<8 ||
-               fields[i].getRight()>width-12 ||
+            if(fields[i].getX()-fields[i-1].getRight()<6 ||
+               fields[i].getRight()>width-10 ||
                fields[i].getWidth()<=0)return 63;
             if(fields[i].getY()!=22||fields[i].getHeight()!=27)return 64;
         }
@@ -454,9 +510,9 @@ int main(int argc,char** argv) {
             return 68;
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
-        editor->setSize(iteration%2 ? 660 : 704,iteration%2 ? 490 : 520);
-        if(editor->getWidth()!=(iteration%2 ? 660 : 704) ||
-           editor->getHeight()!=(iteration%2 ? 490 : 520))return 9;
+        editor->setSize(iteration%2 ? 580 : 612,iteration%2 ? 480 : 500);
+        if(editor->getWidth()!=(iteration%2 ? 580 : 612) ||
+           editor->getHeight()!=(iteration%2 ? 480 : 500))return 9;
         auto* threshold=editor->findChildWithID("param.threshold");
         auto* input=editor->findChildWithID("param.input");
         auto* ratio=editor->findChildWithID("param.ratio");
@@ -489,8 +545,8 @@ int main(int argc,char** argv) {
         if(threshold->getBounds().intersects(ratio->getBounds()))return 20;
         // New compact primary knob row: height budget for larger black LCD
         // without collapsing control interaction areas at minimum size.
-        if(threshold->getHeight()!=70 || input->getHeight()!=70 ||
-           attack->getHeight()!=70 || ratio->getHeight()!=70) {
+        if(threshold->getHeight()!=62 || input->getHeight()!=62 ||
+           attack->getHeight()!=62 || ratio->getHeight()!=62) {
             std::cerr<<"COMPACT_KNOB_HEIGHT_52 "<<threshold->getHeight()
                 <<", "<<input->getHeight()<<", "<<attack->getHeight()
                 <<", "<<ratio->getHeight()<<'\n';
@@ -594,10 +650,6 @@ int main(int argc,char** argv) {
             }
             processor.processBlock(buffer,midi);
         }
-        if(iteration==0) {
-            juce::Timer::callAfterDelay(120,[]{juce::MessageManager::getInstance()->stopDispatchLoop();});
-            juce::MessageManager::getInstance()->runDispatchLoop();
-        }
         if(iteration==1 && argc>1) {
             // Use the populated signal history and active desktop renderer
             // for a useful visual review of the Sidechain page.
@@ -616,15 +668,76 @@ int main(int argc,char** argv) {
                 return 31;
             mainTab->onClick();
         }
+        // Exercise asynchronous ComboBox->browser opening in the FIRST
+        // JUCE dispatch loop. A previous stopDispatchLoop() may leave a
+        // native Windows quit event pending; restarting the loop is not a
+        // reliable test of the browser and produces a false failure 80.
+        // The first loop also drives meter animation for GUI snapshots.
+        // Search browser is a genuine in-plugin overlay with rich metadata.
+        if(iteration==0) {
+            auto* combo=dynamic_cast<juce::ComboBox*>(
+                editor->findChildWithID("view.presets"));
+            auto* browser=editor->findChildWithID("view.preset.browser");
+            if(!combo||!browser||browser->isVisible())return 79;
+            // Programmatic selection does not reproduce a native menu
+            // click on every JUCE host. Invoke the real installed callback
+            // explicitly to test the application command deterministically.
+            combo->setSelectedId(1000,juce::dontSendNotification);
+            if(!combo->onChange)return 84;
+            combo->onChange();
+            // The browser opens asynchronously after the ComboBox closes.
+            if(!browser->isVisible()) {
+                juce::Timer::callAfterDelay(120,[]{
+                    juce::MessageManager::getInstance()->stopDispatchLoop();
+                });
+                juce::MessageManager::getInstance()->runDispatchLoop();
+            }
+            if(!browser->isVisible()||browser->getWidth()<500 ||
+               browser->getHeight()<220) {
+                std::cerr<<"PRESET_BROWSER_80 visible="<<browser->isVisible()
+                         <<" bounds="<<browser->getBounds().toString()
+                         <<" comboId="<<combo->getSelectedId()
+                         <<" comboText="<<combo->getText()<<'\n';
+                return 80;
+            }
+            if(argc>1) {
+                const auto image=editor->createComponentSnapshot(editor->getLocalBounds());
+                auto target=juce::File(juce::String::fromUTF8(argv[1]));
+                target=target.getSiblingFile(
+                    target.getFileNameWithoutExtension()+"-browser.png");
+                auto stream=target.createOutputStream();
+                if(!stream||!juce::PNGImageFormat{}.writeImageToStream(image,*stream))
+                    return 81;
+            }
+            browser->setVisible(false);
+            // Live routing, monitoring and bypass survive preset audition.
+            auto* ext=processor.state.getParameter("external");
+            auto* listen=processor.state.getParameter("listen");
+            auto* bypass=processor.state.getParameter("bypass");
+            if(!ext||!listen||!bypass)return 82;
+            ext->setValueNotifyingHost(ext->convertTo0to1(1.0f));
+            listen->setValueNotifyingHost(listen->convertTo0to1(1.0f));
+            bypass->setValueNotifyingHost(bypass->convertTo0to1(1.0f));
+            combo->setSelectedId(46,juce::sendNotificationSync);
+            if(processor.snapshot()[arson::External]!=1.0f ||
+               processor.snapshot()[arson::Listen]!=1.0f ||
+               processor.snapshot()[arson::Bypass]!=1.0f ||
+               std::abs(processor.snapshot()[arson::Ratio]-
+                        arson::preset::factoryBank()[45].settings[arson::Ratio])>0.01f)
+                return 83;
+            ext->setValueNotifyingHost(0.0f);
+            listen->setValueNotifyingHost(0.0f);
+            bypass->setValueNotifyingHost(0.0f);
+        }
         // Verify the real MINI/FULL UI transformation on the message thread.
         if(iteration==2) {
             auto* mini=dynamic_cast<juce::TextButton*>(editor->findChildWithID("view.compact"));
             if(!mini || !mini->onClick)return 10;
             mini->onClick();
-            if(editor->getHeight()!=330)return 11;
+            if(editor->getHeight()!=320)return 11;
             if(canvas->getBounds()!=juce::Rectangle<int>{13,258,editor->getWidth()-26,47})return 71;
             auto compactImage=editor->createComponentSnapshot(editor->getLocalBounds());
-            if(compactImage.isNull() || compactImage.getHeight()!=330)return 12;
+            if(compactImage.isNull() || compactImage.getHeight()!=320)return 12;
             if(argc>1) {
                 juce::File file(juce::String::fromUTF8(argv[1]));
                 file=file.getSiblingFile(file.getFileNameWithoutExtension()+"-compact.png");
@@ -632,7 +745,7 @@ int main(int argc,char** argv) {
                 if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
             }
             mini->onClick();
-            if(editor->getHeight()!=520)return 14;
+            if(editor->getHeight()!=500)return 14;
             if(canvas->getBounds()!=juce::Rectangle<int>{8,
                 arson::ui::EditorMetrics::displayTop,editor->getWidth()-16,
                 editor->getHeight()-arson::ui::EditorMetrics::displayBottomReserve})return 72;
@@ -644,4 +757,11 @@ int main(int argc,char** argv) {
             file.deleteFile();auto stream=file.createOutputStream();if(!stream || !juce::PNGImageFormat{}.writeImageToStream(image,*stream))return 4;}
     }
     processor.releaseResources();std::cout<<"PASS: state round-trip, audio, zero latency, editor resize/reopen/render\n";
+    return 0;
+}
+
+int main(int argc,char** argv) {
+    const int result=runSmoke(argc,argv);
+    if(result!=0)std::cerr<<"PLUGIN_SMOKE_FAILURE_CODE "<<result<<'\n';
+    return result;
 }
