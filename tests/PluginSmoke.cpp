@@ -37,18 +37,33 @@ int main(int argc,char** argv) {
         // Exercise the same API as the real scope: Graphics::strokePath
         // with a cached multi-stop brush, NOT Graphics::drawLine.
         juce::Image canvas(juce::Image::ARGB,240,16,true);
-        juce::Graphics graph(canvas);
-        graph.setGradientFill(fade);
-        juce::Path stroke;
-        stroke.startNewSubPath(0.0f,8.0f);
-        stroke.lineTo(239.0f,8.0f);
-        graph.strokePath(stroke,juce::PathStrokeType(2.0f));
+        {
+            // JUCE may defer its raster writes until Graphics is destroyed.
+            // Reading the image while Graphics still owns its renderer can
+            // return the untouched, all-transparent pixels on Windows.
+            juce::Graphics graph(canvas);
+            graph.setGradientFill(fade);
+            juce::Path stroke;
+            stroke.startNewSubPath(0.0f,8.0f);
+            stroke.lineTo(239.0f,8.0f);
+            graph.strokePath(stroke,juce::PathStrokeType(2.0f));
+            // Solid control verifies that the raster backend committed its
+            // writes; it is outside the sampled gradient row.
+            graph.setColour(juce::Colours::white);
+            graph.fillRect(115,12,10,2);
+        } // complete paint/flush before inspecting canvas
+        const float control=canvas.getPixelAt(120,12).getFloatAlpha();
         const float left=canvas.getPixelAt(5,8).getFloatAlpha();
         const float centre=canvas.getPixelAt(120,8).getFloatAlpha();
         const float right=canvas.getPixelAt(234,8).getFloatAlpha();
+        if(control<0.95f) {
+            std::cerr<<"raster-backend: control pixel="<<control
+                <<" (expected opaque after Graphics scope)"<<'\n';
+            return 27;
+        }
         if(!(centre>0.55f && left<centre*0.55f && right<centre*0.55f)) {
             std::cerr<<"raster-fade: alpha left="<<left
-                <<" centre="<<centre<<" right="<<right<<"\\n";
+                <<" centre="<<centre<<" right="<<right<<'\n';
             return 26;
         }
     }
