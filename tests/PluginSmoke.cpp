@@ -186,7 +186,14 @@ int main(int argc,char** argv) {
            plate.getPixelAt(0,0).getFloatAlpha()>0.04f ||
            thumb.getPixelAt(0,0).getFloatAlpha()>0.04f ||
            plate.getPixelAt(170,29).getFloatAlpha()<0.92f ||
-           thumb.getPixelAt(29,62).getFloatAlpha()<0.92f) return 47;
+           thumb.getPixelAt(29,62).getFloatAlpha()<0.92f) {
+            std::cerr<<"GUNMETAL_RESOURCE_47 track="<<plate.getWidth()
+                     <<"x"<<plate.getHeight()<<" thumb="<<thumb.getWidth()
+                     <<"x"<<thumb.getHeight()<<" cornerAlpha="
+                     <<thumb.getPixelAt(0,0).getFloatAlpha()<<" centreAlpha="
+                     <<thumb.getPixelAt(29,62).getFloatAlpha()<<'\n';
+            return 47;
+        }
 
         // Raster-render all three slider positions via the *production*
         // LookAndFeel, then inspect the LED at a track location untouched
