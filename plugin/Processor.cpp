@@ -49,7 +49,13 @@ void Processor::run(juce::AudioBuffer<float>& buffer,bool hostBypass) {
         side.getArrayOfReadPointers(),side.getNumChannels(),&meters);
 }
 void Processor::processBlock(juce::AudioBuffer<float>& b,juce::MidiBuffer&) { run(b,false); }
-void Processor::processBlockBypassed(juce::AudioBuffer<float>& b,juce::MidiBuffer&) { run(b,true); }
+void Processor::processBlockBypassed(juce::AudioBuffer<float>& b,juce::MidiBuffer&) {
+    // Host-level bypass is an immediate bit-transparent passthrough, including
+    // the FIRST block: no 5ms ramp, gain, detector math or queue writes.
+    // Main input/output are in-place in JUCE; do not touch extra SC channels.
+    // APVTS "bypass" remains independently smoothed during ordinary processing.
+    juce::ignoreUnused(b);
+}
 juce::AudioProcessorParameter* Processor::getBypassParameter() const { return state.getParameter("bypass"); }
 juce::AudioProcessorEditor* Processor::createEditor() { return new Editor(*this); }
 void Processor::getStateInformation(juce::MemoryBlock& dest) {

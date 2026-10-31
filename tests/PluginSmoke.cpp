@@ -1,5 +1,6 @@
 #include "../plugin/Processor.h"
 #include "../plugin/Editor.h"
+#include "../plugin/HeaderLayout.h"
 #include "../plugin/PresetIO.h"
 #include "../plugin/GraphPaint.h"
 #include "../plugin/SurfacePaint.h"
@@ -139,13 +140,22 @@ int main(int argc,char** argv) {
         if(std::abs(signal.getSample(0,blockSize-1)-0.05f)>0.002f ||
            std::abs(signal.getSample(1,blockSize-1)-0.025f)>0.002f)return failHost(40);
 
-        // Host bypass path must ignore Input/Makeup and output the exact
-        // input waveform after the finite click-avoidance transition.
+        // Host bypass MUST be transparent from its very first sample, even
+        // with large active input/makeup gains and a running detector.
         if(!set("input",12.0f)||!set("makeup",12.0f))return failHost(41);
-        for(int b=0;b<12;++b)process(true);
-        if(std::abs(signal.getSample(0,blockSize-1)-0.05f)>1.0e-5f ||
-           std::abs(signal.getSample(1,blockSize-1)-0.025f)>1.0e-5f)
-            return failHost(42);
+        process(true);
+        for(int i=0;i<blockSize;++i) {
+            if(signal.getSample(0,i)!=0.05f ||
+               signal.getSample(1,i)!=0.025f ||
+               signal.getSample(2,i)!=1.0f)return failHost(42);
+        }
+        // It must not latch the APVTS bypass switch when processing resumes.
+        if(live.snapshot()[arson::Bypass]!=0.0f)return failHost(43);
+        if(!set("input",0.0f)||!set("makeup",0.0f)||
+           !set("external",1.0f))return failHost(41);
+        for(int b=0;b<warmup;++b)process(false);
+        if(!(signal.getSample(0,blockSize-1)<0.045f &&
+             signal.getSample(1,blockSize-1)<0.025f))return failHost(42);
         if(live.getLatencySamples()!=0)return failHost(43);
     }
     {
@@ -285,6 +295,41 @@ int main(int argc,char** argv) {
         if(countHue(render("Bypass",true),false)<70||
            countHue(render("Bypass",false),true)<70)return 58;
     }
+    // The small header uses the real metallic EMBOSS PNG, not a scaled-down
+    // two-line neon image. RGBA, bright metal and no red subtitle are required.
+    {
+        const auto logo=juce::ImageFileFormat::loadFrom(
+            BinaryData::arsoncomp_header_logo_png,
+            static_cast<std::size_t>(BinaryData::arsoncomp_header_logo_pngSize));
+        if(!logo.isValid()||logo.getWidth()!=360||logo.getHeight()!=72||
+           logo.getPixelAt(0,0).getFloatAlpha()>0.02f)return 59;
+        int brightMetal=0,redPixels=0;
+        for(int y=0;y<logo.getHeight();++y)
+            for(int x=0;x<logo.getWidth();++x) {
+                const auto p=logo.getPixelAt(x,y);
+                if(p.getAlpha()>170 && p.getRed()>145 &&
+                   std::abs(int(p.getRed())-int(p.getGreen()))<30 &&
+                   std::abs(int(p.getGreen())-int(p.getBlue()))<35)
+                    ++brightMetal;
+                if(p.getAlpha()>120 && p.getRed()>p.getGreen()+45)
+                    ++redPixels;
+            }
+        if(brightMetal<600||redPixels>10)return 60;
+        // Real 131px GUI header footprint: verify highlights survive downscale.
+        juce::Image header(juce::Image::RGB,148,66,true);
+        {
+            juce::Graphics g(header);
+            g.fillAll(juce::Colour{0xff282c2f});
+            g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+            g.drawImageWithin(logo,13,17,131,31,juce::RectanglePlacement::centred);
+        }
+        int visibleHighlight=0;
+        for(int y=19;y<46;++y)
+            for(int x=14;x<144;++x)
+                if(header.getPixelAt(x,y).getBrightness()>0.54f)
+                    ++visibleHighlight;
+        if(visibleHighlight<80)return 61;
+    }
     // Cached chassis must be genuinely brushed grey, while the LCD
     // must remain deep black. Probe actual JUCE image rasterization after
     // the Graphics lifetime ends (Windows may defer image writes).
@@ -342,6 +387,21 @@ int main(int argc,char** argv) {
     file.deleteFile();
     juce::AudioBuffer<float> buffer(2,128);juce::MidiBuffer midi;
     for(int j=0;j<1000;++j) {buffer.clear();buffer.setSample(0,0,0.5f);processor.processBlock(buffer,midi);}
+    // Full toolbar geometry across minimum/default/wide editor widths:
+    // consistent 10px gaps, uniform baseline and bounded preset dropdown.
+    for(const int width : {740,780,900,1200}) {
+        const auto h=arson::ui::HeaderLayout::calculate(width);
+        const std::array<juce::Rectangle<int>,7> fields{
+            h.logo,h.mini,h.model,h.preset,h.compare,h.file,h.bypass};
+        if(h.preset.getWidth()<144||h.preset.getWidth()>176||
+           h.bypass.getRight()!=width-14||h.logo.getX()!=14)return 62;
+        for(std::size_t i=1;i<fields.size();++i) {
+            if(fields[i].getX()-fields[i-1].getRight()<10 ||
+               fields[i].getRight()>width-14 ||
+               fields[i].getWidth()<=0)return 63;
+            if(fields[i].getY()!=24||fields[i].getHeight()!=28)return 64;
+        }
+    }
     for(int iteration=0;iteration<8;++iteration) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
@@ -404,6 +464,16 @@ int main(int argc,char** argv) {
         if(!hp||!lp||!detector||!autoMode||!external||!listen||
            !style||!presets||!save||!load||!file||!compare||!bypass||
            !dynTab||!scTab||!range||!mix)return 21;
+        // Actual JUCE component positions must match the shared header grid;
+        // this catches collisions and regressions in MINI/FULL resizing.
+        const auto header=arson::ui::HeaderLayout::calculate(editor->getWidth());
+        const auto* mini=editor->findChildWithID("view.compact");
+        if(!mini || mini->getBounds()!=header.mini ||
+           style->getBounds()!=header.model ||
+           presets->getBounds()!=header.preset ||
+           compare->getBounds()!=header.compare ||
+           file->getBounds()!=header.file ||
+           bypass->getBounds()!=header.bypass)return 65;
         // File controls are deliberately not mounted in the visible header.
         // Both independent tab views must have unclipped, non-overlapping
         // active controls at 740 and 780px.

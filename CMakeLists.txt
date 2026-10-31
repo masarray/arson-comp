@@ -53,7 +53,8 @@ if(ARSON_BUILD_PLUGIN)
             assets/gunmetal_slider_track.png
             assets/gunmetal_slider_thumb_red.png
             assets/toggle/arson_toggle_on.png
-            assets/toggle/arson_toggle_off.png)
+            assets/toggle/arson_toggle_off.png
+            assets/arsoncomp_header_logo.png)
   target_sources(ArSonComp PRIVATE plugin/Processor.cpp plugin/Editor.cpp)
   if(MSVC)
     target_compile_options(ArSonComp PRIVATE /utf-8)
