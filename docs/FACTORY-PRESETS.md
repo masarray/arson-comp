@@ -1,6 +1,6 @@
-# ArSonComp Factory Bank v1 — Original presets
+# ArSonComp Factory Bank v2 — Original presets with calibrated starting makeup
 
-46 original purpose-built compressor starting points. Grouped into 10 categories.
+46 original purpose-built compressor starting points in 10 categories. Every factory program now includes a positive **makeup gain** intended to make the effect audible rather than sounding merely quieter than bypass.
 
 ## Clean
 - **Neutral Start** — A balanced starting point. Adjust Threshold for the desired gain reduction.
@@ -73,3 +73,11 @@ This bank draws inspiration from the **workflow** of modern professional compres
 IMPORTANT: presets are starting points. Threshold and gain reduction depend on incoming source level. All presets leave external SC, listen, and bypass OFF to prevent unexpected silent/misrouted live audio. Preset loading preserves the current live routing/safety switches. No new DSP latency or audio-thread allocations.
 
 Reference: https://www.fabfilter.com/help/pro-c/presets/loadingpresets
+
+## Preset loudness / makeup calibration (October 2026)
+
+Every factory program receives a deterministic, fixed **starting Makeup gain**, calculated when the static factory bank is initialized (never on the audio thread): estimate static reduction for a reference **−18 dBFS peak** using the exact knee/range/ratio transfer law, weight it by the preset's Mix, then add a modest intentional audible lift. Vocal and live programs allow up to 6 dB, general instruments/buses up to 5.8 dB, mastering up to 3.2 dB, and deliberately aggressive special effects up to 8 dB. Neutral Start now contains real gentle 2.5:1 / −24 dB compression, instead of factory defaults with almost no reference-level gain reduction.
+
+This is **not** automatic loudness measurement, adaptive normalization, peak limiting, or a guarantee that louder means better. Incoming material with hot peaks can clip later in the DAW or audio interface when makeup is enabled. Reduce Makeup or Input to maintain at least ~3–6 dB of useful monitoring headroom; compare bypass at matched loudness before making critical mix/master decisions. Vocal, karaoke and broadcast presets favor an audible immediately useful lift, whereas mastering deliberately remains conservative. Source level and playing style still affect actual gain reduction.
+
+Automated smoke checks require all 46 programs to have positive makeup, meaningful static compression at a −12 dBFS peak reference and finite audio below 0 dBFS for a modest nominal test input; these are *bounds*, not a guarantee of no clipping on arbitrary signals. No DSP/latency/host parameter ID or preset schema change. Future calibrated reference WAV and perceptual ABX testing remain pending.

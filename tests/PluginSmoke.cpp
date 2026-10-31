@@ -405,6 +405,29 @@ static int runSmoke(int argc,char** argv) {
                entry.settings[arson::Listen]!=0 ||
                entry.settings[arson::Bypass]!=0)return 75;
             if(arson::preset::findFactoryId(entry.id)<0)return 76;
+            // Factory compensation must be positive, effective and bounded.
+            if(entry.settings[arson::Makeup]<0.84f ||
+               entry.settings[arson::Makeup]>8.01f ||
+               arson::reduction(-12.0f,entry.settings[arson::Threshold],
+                   entry.settings[arson::Ratio],entry.settings[arson::Knee],
+                   entry.settings[arson::Range])<0.25f)return 82;
+            {
+                arson::Compressor calibrated;
+                calibrated.prepare(48000.0,entry.settings);
+                std::array<float,128> testL{},testR{};
+                float* ab[]{testL.data(),testR.data()};
+                float peak=0.0f;
+                for(int block=0;block<80;++block) {
+                    for(int i=0;i<128;++i) {
+                        testL[i]=0.18f*std::sin((block*128+i)*0.051f);
+                        testR[i]=0.14f*std::cos((block*128+i)*0.073f);
+                    }
+                    calibrated.process(ab,2,128);
+                    for(int i=0;i<128;++i)
+                        peak=std::max(peak,std::max(std::abs(testL[i]),std::abs(testR[i])));
+                }
+                if(!std::isfinite(peak) || peak>0.95f)return 83;
+            }
             arson::Compressor engine;
             engine.prepare(48000.0,entry.settings);
             std::array<float,128> left{},right{};
@@ -466,15 +489,15 @@ static int runSmoke(int argc,char** argv) {
             return 66;
     }
     // Header invariants for minimum, default, legacy and maximum widths.
-    for(const int width : {660,704,780,1040}) {
+    for(const int width : {580,612,704,1000}) {
         const auto h=arson::ui::HeaderLayout::calculate(width);
         const std::array<juce::Rectangle<int>,7> fields{
             h.logo,h.mini,h.model,h.preset,h.compare,h.file,h.bypass};
-        if(h.preset.getWidth()<124||h.preset.getWidth()>154||
-           h.bypass.getRight()!=width-12||h.logo.getX()!=12)return 62;
+        if(h.preset.getWidth()<124||h.preset.getWidth()>148||
+           h.bypass.getRight()!=width-10||h.logo.getX()!=10)return 62;
         for(std::size_t i=1;i<fields.size();++i) {
-            if(fields[i].getX()-fields[i-1].getRight()<8 ||
-               fields[i].getRight()>width-12 ||
+            if(fields[i].getX()-fields[i-1].getRight()<6 ||
+               fields[i].getRight()>width-10 ||
                fields[i].getWidth()<=0)return 63;
             if(fields[i].getY()!=22||fields[i].getHeight()!=27)return 64;
         }
@@ -487,9 +510,9 @@ static int runSmoke(int argc,char** argv) {
             return 68;
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
-        editor->setSize(iteration%2 ? 660 : 704,iteration%2 ? 490 : 520);
-        if(editor->getWidth()!=(iteration%2 ? 660 : 704) ||
-           editor->getHeight()!=(iteration%2 ? 490 : 520))return 9;
+        editor->setSize(iteration%2 ? 580 : 612,iteration%2 ? 480 : 500);
+        if(editor->getWidth()!=(iteration%2 ? 580 : 612) ||
+           editor->getHeight()!=(iteration%2 ? 480 : 500))return 9;
         auto* threshold=editor->findChildWithID("param.threshold");
         auto* input=editor->findChildWithID("param.input");
         auto* ratio=editor->findChildWithID("param.ratio");
@@ -522,8 +545,8 @@ static int runSmoke(int argc,char** argv) {
         if(threshold->getBounds().intersects(ratio->getBounds()))return 20;
         // New compact primary knob row: height budget for larger black LCD
         // without collapsing control interaction areas at minimum size.
-        if(threshold->getHeight()!=70 || input->getHeight()!=70 ||
-           attack->getHeight()!=70 || ratio->getHeight()!=70) {
+        if(threshold->getHeight()!=62 || input->getHeight()!=62 ||
+           attack->getHeight()!=62 || ratio->getHeight()!=62) {
             std::cerr<<"COMPACT_KNOB_HEIGHT_52 "<<threshold->getHeight()
                 <<", "<<input->getHeight()<<", "<<attack->getHeight()
                 <<", "<<ratio->getHeight()<<'\n';
@@ -692,10 +715,10 @@ static int runSmoke(int argc,char** argv) {
             auto* mini=dynamic_cast<juce::TextButton*>(editor->findChildWithID("view.compact"));
             if(!mini || !mini->onClick)return 10;
             mini->onClick();
-            if(editor->getHeight()!=330)return 11;
+            if(editor->getHeight()!=320)return 11;
             if(canvas->getBounds()!=juce::Rectangle<int>{13,258,editor->getWidth()-26,47})return 71;
             auto compactImage=editor->createComponentSnapshot(editor->getLocalBounds());
-            if(compactImage.isNull() || compactImage.getHeight()!=330)return 12;
+            if(compactImage.isNull() || compactImage.getHeight()!=320)return 12;
             if(argc>1) {
                 juce::File file(juce::String::fromUTF8(argv[1]));
                 file=file.getSiblingFile(file.getFileNameWithoutExtension()+"-compact.png");
@@ -703,7 +726,7 @@ static int runSmoke(int argc,char** argv) {
                 if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
             }
             mini->onClick();
-            if(editor->getHeight()!=520)return 14;
+            if(editor->getHeight()!=500)return 14;
             if(canvas->getBounds()!=juce::Rectangle<int>{8,
                 arson::ui::EditorMetrics::displayTop,editor->getWidth()-16,
                 editor->getHeight()-arson::ui::EditorMetrics::displayBottomReserve})return 72;

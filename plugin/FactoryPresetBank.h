@@ -24,12 +24,29 @@ inline FactoryPreset make(const char* id,const char* group,const char* name,
     v.settings.value[External]=0.0f;
     v.settings.value[Listen]=0.0f;
     v.settings.value[Bypass]=0.0f;
+    // Factory makeup is an intentional *starting* compensation, not
+    // automatic loudness normalization and never a limiter. For a nominal
+    // -18 dBFS reference, estimate static GR with the actual compressor
+    // transfer law, scale by wet mix, and add a conservative audible lift.
+    // All work happens once when the factory catalog is first built on
+    // the message thread, not in the audio callback.
+    const std::string_view category(group);
+    const bool mastering=category=="Mastering";
+    const bool voice=category=="Vocals" || category=="Live & Broadcast";
+    const bool effects=category=="Special";
+    const float referenceGr=reduction(-18.0f,v.settings[Threshold],
+        v.settings[Ratio],v.settings[Knee],v.settings[Range]);
+    const float wet=v.settings[Mix]*0.01f;
+    const float lift=mastering ? 0.85f : voice ? 1.55f : effects ? 1.30f : 1.35f;
+    const float maximum=mastering ? 3.2f : effects ? 8.0f : voice ? 6.0f : 5.8f;
+    v.settings.value[Makeup]=std::clamp(lift + 0.82f*referenceGr*wet,
+        lift,maximum);
     v.settings.sanitize();
     return v;
 }
 inline const std::vector<FactoryPreset>& factoryBank() {
     static const std::vector<FactoryPreset> bank={
-        make("neutral-start","Clean","Neutral Start","clean neutral transparent","A balanced starting point. Adjust Threshold for the desired gain reduction.", {}),
+        make("neutral-start","Clean","Neutral Start","clean neutral transparent","A clear, audible starter with moderate leveling and compensated output.", {{Threshold,-24.0f},{Ratio,2.5f},{Attack,16.0f},{Release,170.0f},{Knee,10.0f},{Range,12.0f}}),
         make("smooth-transparent","Clean","Transparent Control","clean smooth subtle","Low-ratio, wide-knee compression for natural level regulation.", {{Threshold,-21.0f}, {Ratio,1.8f}, {Attack,28.0f}, {Release,240.0f}, {Knee,18.0f}, {Range,12.0f}, {Style,2.0f}}),
         make("peak-catcher","Clean","Peak Catch","clean peaks transient","Fast peak containment with limited reduction; not a true-peak limiter.", {{Threshold,-16.0f}, {Ratio,5.0f}, {Attack,1.5f}, {Release,75.0f}, {Knee,3.0f}, {Range,10.0f}, {Detector,0.0f}}),
         make("parallel-preserve","Clean","Parallel Control","parallel clean transient","Parallel compression that retains part of the unprocessed dynamics.", {{Threshold,-25.0f}, {Ratio,5.0f}, {Attack,12.0f}, {Release,140.0f}, {Knee,8.0f}, {Mix,50.0f}, {Range,18.0f}}),

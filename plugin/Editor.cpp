@@ -814,7 +814,7 @@ void Editor::resized() {
     for(std::size_t k=0;k<main.size();++k) {
         const auto i=main[k];const int x=14+static_cast<int>(k)*cell;
         labels[i].setBounds(x,mainY+3,cell,17);
-        knobs[i].setBounds(x+3,mainY+20,cell-6,70);
+        knobs[i].setBounds(x+3,mainY+20,cell-6,62);
     }
 
     const int bottomY=compactMode?166:
@@ -836,10 +836,12 @@ void Editor::resized() {
     constexpr std::array<std::size_t,2> filters{arson::Highpass,arson::Lowpass};
     // Responsive five-column sidechain panel, no fixed overflow positions.
     const int available=w-32;
-    const int filterSlot=juce::jlimit(136,174,available*23/100);
-    const int detW=juce::jlimit(92,108,available*14/100);
-    const int extW=juce::jlimit(108,118,available*17/100);
-    const int listenW=juce::jlimit(105,118,available*16/100);
+    // Allocate all SIDECHAIN columns inside the 580px minimum width.
+    const int usable=available-3*8;
+    const int filterSlot=usable*23/100;
+    const int detW=usable*17/100;
+    const int extW=usable*19/100;
+    const int listenW=usable-2*filterSlot-detW-extW;
     const int filterStart=16;
     for(std::size_t k=0;k<filters.size();++k) {
         const auto i=filters[k];const int x=filterStart+static_cast<int>(k)*filterSlot;

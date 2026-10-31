@@ -80,3 +80,9 @@ The preset dropdown includes **46 original ArSonComp factory starting points** i
 Search matches name, category, tags and description. Pick a row to see its purpose and author. APPLY auditions without closing; double-click applies and closes; keyboard arrows and Enter apply, Escape closes. STAR/UNSTAR stores stable favorite IDs in the user application data directory, and FAVORITES filters the list. Use the bank's preset list directly for faster navigation.
 
 Presets are designed for ArSonComp's independent three compressor models, **not** imported FabFilter .ffp programs or claims of matching proprietary factory sounds. Each preset preserves the current External SC, Listen and Bypass switches, so recall never silently changes live routing. Threshold and amount of reduction always depend on the input's actual level; tune to source and loudness-match listening comparisons. FILE Save/Open continues to support the existing .arsoncomp user preset format.
+
+## Smaller factory-browser GUI (2026-10-31)
+
+New default FULL window **612×500**, minimum **580×480**; MINI height **320**, retaining the live meter well. Header is a single compact responsive row (100px brand, smaller model/actions, usable preset field). Main rotary controls retain a 62px drag target, and SIDECHAIN HP/LP/detector/EXT/LISTEN widths are calculated from available space to avoid clipping at minimum width. The categorized 46-preset browser remains a transient overlay, not a permanent wide side panel.
+
+Factory programs now include purpose-specific Makeup starting gain, generally stronger for vocals/live and gentler for mastering. The goal is a noticeable first impression **without silently bypassing dynamics**, not guaranteed louder-is-better or universal headroom safety. Watch the output meter, adjust Input/Makeup and compare Bypass at matched loudness.

@@ -20,3 +20,7 @@ Technical reference: JUCE developer ADC 2025 session on component hierarchy, opa
 ## M4 compact and legible isolated LCD
 
 Keep the optimized opaque LCD child and idle-repaint coalescing with the new default 704×520 and minimum 660×490. MINI remains 330px high with a 47px meter well. Captions have higher contrast, separator rules are removed, and the new geometry is covered by actual JUCE visual smoke tests. CI CPU timing is not real-device XRUN proof.
+
+## Compact second pass
+
+Default window reduced from **704×520 to 612×500** (~16% less screen area); minimum 580×480. The seven main knobs are drawn in 62px-high controls while preserving per-control labels, mouse hit targets and the light gunmetal slider rails. All 5 SIDECHAIN elements reflow inside minimum width with 8px gaps. The isolated opaque LCD and idle repaint coalescing remain unchanged; audio DSP does not depend on window size.

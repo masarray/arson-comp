@@ -117,7 +117,7 @@ private:
     arson::Parameters alternate, presetSnapshot;
     bool alternateActive=false;
     bool compactMode=false,thresholdDragging=false,sidechainPanel=false;
-    int expandedWidth=704,expandedHeight=520;
+    int expandedWidth=612,expandedHeight=500;
     std::array<arson::MeterFrame,400> history{};
     std::size_t head=0;
     float inputDb=-120,outputDb=-120,gr=0;
