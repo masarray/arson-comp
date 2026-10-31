@@ -370,10 +370,18 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
             presets.setText(currentPresetTitle,juce::dontSendNotification);
             // Open after the native combo popup has completed its selection
             // event, so the host cannot immediately reclaim focus/z-order.
-            juce::Component::SafePointer<Editor> safe(this);
-            juce::MessageManager::callAsync([safe] {
-                if(auto* editor=safe.getComponent())editor->openPresetBrowser();
-            });
+            // When rendered offscreen (JUCE smoke/headless host), no
+            // desktop popup exists to dismiss; open synchronously. Real
+            // visible hosts keep the deferred call to avoid popup z-order.
+            if(!isShowing()) {
+                openPresetBrowser();
+            } else {
+                juce::Component::SafePointer<Editor> safe(this);
+                juce::MessageManager::callAsync([safe] {
+                    if(auto* editor=safe.getComponent())
+                        editor->openPresetBrowser();
+                });
+            }
         } else if(id>0) applyPreset(id);
     };
     addAndMakeVisible(presets);
