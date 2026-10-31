@@ -169,8 +169,8 @@ int main(int argc,char** argv) {
     // JUCE BinaryData and will not require an external install path.
     {
         const auto image=juce::ImageFileFormat::loadFrom(
-            BinaryData::PAN_SLIDER_png,
-            static_cast<std::size_t>(BinaryData::PAN_SLIDER_pngSize));
+            BinaryData::sliderthumb_png,
+            static_cast<std::size_t>(BinaryData::sliderthumb_pngSize));
         if(!image.isValid() || image.getWidth()!=18 || image.getHeight()!=40 ||
            image.getPixelAt(0,0).getFloatAlpha()>0.01f ||
            image.getPixelAt(9,20).getFloatAlpha()<0.9f) return 47;

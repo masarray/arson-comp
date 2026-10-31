@@ -39,8 +39,8 @@ CompLook::CompLook() {
         static_cast<std::size_t>(BinaryData::black_brushed_knob_jpgSize));
     jassert(sourceFace.isValid());
     sliderThumb=juce::ImageFileFormat::loadFrom(
-        BinaryData::PAN_SLIDER_png,
-        static_cast<std::size_t>(BinaryData::PAN_SLIDER_pngSize));
+        BinaryData::sliderthumb_png,
+        static_cast<std::size_t>(BinaryData::sliderthumb_pngSize));
     jassert(sliderThumb.isValid());
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
