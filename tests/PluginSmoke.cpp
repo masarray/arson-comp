@@ -679,8 +679,19 @@ static int runSmoke(int argc,char** argv) {
             auto* browser=editor->findChildWithID("view.preset.browser");
             if(!combo||!browser||browser->isVisible())return 79;
             combo->setSelectedId(1000,juce::sendNotificationSync);
+            // Some JUCE ComboBox/host combinations deliver the change after
+            // the popup selection message has finished. Allow that dispatch
+            // before testing visibility, rather than requiring re-entrant GUI.
+            if(!browser->isVisible())
+                juce::MessageManager::getInstance()->runDispatchLoopUntil(75);
             if(!browser->isVisible()||browser->getWidth()<500 ||
-               browser->getHeight()<220)return 80;
+               browser->getHeight()<220) {
+                std::cerr<<"PRESET_BROWSER_80 visible="<<browser->isVisible()
+                         <<" bounds="<<browser->getBounds().toString()
+                         <<" comboId="<<combo->getSelectedId()
+                         <<" comboText="<<combo->getText()<<'\n';
+                return 80;
+            }
             if(argc>1) {
                 const auto image=editor->createComponentSnapshot(editor->getLocalBounds());
                 auto target=juce::File(juce::String::fromUTF8(argv[1]));
