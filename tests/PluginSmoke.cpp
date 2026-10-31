@@ -10,6 +10,26 @@
 #include <initializer_list>
 int main(int argc,char** argv) {
     juce::ScopedJuceInitialiser_GUI gui;
+#if JUCE_WINDOWS
+    // The standalone must offer native low-latency ASIO (e.g. Maono PS22)
+    // in Options, rather than silently hiding it behind Windows Audio.
+    // Only the *backend* is checked on CI, not a physical connected device.
+#if !JUCE_ASIO
+#error "Windows Standalone ASIO backend was disabled in this build"
+#endif
+    {
+        juce::AudioDeviceManager deviceManager;
+        bool hasNativeAsio=false;
+        for(auto* type:deviceManager.getAvailableDeviceTypes())
+            if(type && type->getTypeName().equalsIgnoreCase("ASIO"))
+                hasNativeAsio=true;
+        if(!hasNativeAsio) {
+            std::cerr<<"STANDALONE_ASIO_BACKEND_MISSING\n";
+            return 81;
+        }
+        std::cout<<"PASS: native Windows ASIO device backend is registered\n";
+    }
+#endif
     // Quantitative edge-dissolve contract: endpoints transparent, the
     // central ~73% clearly visible, symmetric fades and stable RGB.
     {
