@@ -215,7 +215,7 @@ int main(int argc,char** argv) {
              threshold->getX()<ratio->getX()))return 19;
         for(const auto* candidate : {threshold,input,ratio,attack}) {
             const auto* slider=dynamic_cast<const juce::Slider*>(candidate);
-            if(!slider || slider->getTextBoxStyle()!=juce::Slider::NoTextBox)
+            if(!slider || slider->getTextBoxPosition()!=juce::Slider::NoTextBox)
                 return 48;
             // Value remains available by accessible popup/tooltips even
             // though boxed numeric labels no longer crowd the control strip.
