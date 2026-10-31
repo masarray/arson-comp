@@ -8,6 +8,8 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <iostream>
 #include <initializer_list>
+#include <cmath>
+#include <algorithm>
 int main(int argc,char** argv) {
     juce::ScopedJuceInitialiser_GUI gui;
     // Quantitative edge-dissolve contract: endpoints transparent, the
@@ -425,6 +427,10 @@ int main(int argc,char** argv) {
     }
     for(int iteration=0;iteration<8;++iteration) {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+        if(iteration==0 &&
+           (editor->getWidth()!=arson::ui::EditorMetrics::defaultWidth ||
+            editor->getHeight()!=arson::ui::EditorMetrics::defaultHeight))
+            return 68;
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
         editor->setSize(iteration%2 ? 660 : 704,iteration%2 ? 490 : 520);
@@ -485,6 +491,12 @@ int main(int argc,char** argv) {
         if(!hp||!lp||!detector||!autoMode||!external||!listen||
            !style||!presets||!save||!load||!file||!compare||!bypass||
            !dynTab||!scTab||!range||!mix)return 21;
+        // Footer controls and the 7 primary rotary knobs must never collide
+        // at the new compact minimum height.
+        if(input->getBottom()+5>dynTab->getY() ||
+           threshold->getBottom()+5>dynTab->getY() ||
+           dynTab->getBottom()>range->getY()+1 ||
+           scTab->getBottom()>mix->getY()+1)return 67;
         // Actual JUCE component positions must match the shared header grid;
         // this catches collisions and regressions in MINI/FULL resizing.
         const auto header=arson::ui::HeaderLayout::calculate(editor->getWidth());
