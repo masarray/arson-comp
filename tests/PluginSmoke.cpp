@@ -239,6 +239,13 @@ static int runSmoke(int argc,char** argv) {
         if(graphite.getRed()>=85 || graphite.getGreen()>=90 ||
            graphite.getBlue()>=95 || graphite.getFloatAlpha()<0.80f)
             return 82;
+        // The v1 dark thumb was technically valid but almost invisible at
+        // the 14px actual fader width. Require a polished edge inside the
+        // PNG itself, not a second silver overlay painted by the renderer.
+        const auto bevel=thumb.getPixelAt(15,40);
+        if(bevel.getBrightness()<0.30f ||
+           bevel.getBrightness()-graphite.getBrightness()<0.14f ||
+           bevel.getFloatAlpha()<0.90f) return 86;
         // Verify the complete rotary red arc (not only its metal JPEG face)
         // fits inside the enlarged knob hit rectangle, including stroke.
         for(int width : {62,66,72,78,100})
