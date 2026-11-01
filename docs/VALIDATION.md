@@ -1,6 +1,6 @@
 # Validation record
 
-> **Latest verified baseline (2026-10-31):** Both Windows build/editor-smoke/benchmark/artifact and Linux engine-safety passed for source commit `7b340eb2ee5740df13b52b5bfcf984a3b66d0dd3`, [Actions #41202549812](https://github.com/masarray/arson-comp/actions/runs/41202549812). The Windows artifact includes full 780×640, minimum 740×585, sidechain 740×585, and MINI 780×330 actual JUCE screenshots. Static layout/asset/value-readout tests passed. Older pending-CI descriptions below are historical milestones, **not** the latest result. Real DAW/device/pluginval tests remain pending.\n
+> **Current public verification (2026-11-01):** ArSonComp [v0.2.0-rc.1](https://github.com/masarray/arson-comp/releases/tag/v0.2.0-rc.1) was packaged from commit `0a039ef6d340e26aa01a62df3670f74da1f03a12` with a successful [Windows/Linux/macOS release workflow #41273600039](https://github.com/masarray/arson-comp/actions/runs/41273600039). The latest product screenshots are from [M7 Windows editor CI #41267899861](https://github.com/masarray/arson-comp/actions/runs/41267899861), with Full 612×580, Minimum/Sidechain 580×540 and MINI 612×320. The rest of this document retains historical engineering evidence. Physical audio-device testing, pluginval in real hosts, macOS notarization and licensing review are **not** complete gates; see [current release status](RELEASE-STATUS.md).
 
 Initial implementation, 2026-10-31.
 

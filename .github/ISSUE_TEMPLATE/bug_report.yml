@@ -1,0 +1,79 @@
+name: Audio or GUI bug
+description: Report a reproducible ArSonComp issue with technical context.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the problem without sharing private account data, tokens, or passwords. Check if it also occurs with host bypass.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 10/11
+        - Ubuntu / Debian
+        - Other Linux
+        - macOS Apple Silicon
+        - macOS Intel
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: Plugin format
+      options:
+        - VST3 in a host
+        - Standalone
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ArSonComp version/build
+      placeholder: v0.2.0-rc.1
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: DAW/host and version
+      placeholder: Reaper, Studio One, ArSonMiX, or Standalone
+  - type: input
+    id: driver
+    attributes:
+      label: Audio device / driver / rate / buffer
+      placeholder: Maono PS22 / ASIO / 48 kHz / 128 samples
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include current preset, routing, bypass, sidechain, and automation when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include any audible glitch, host xrun count, visual collision, error dialog, or crash.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Audio, screenshots, logs
+      description: Attach only non-sensitive evidence when available.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Isolation (when relevant)
+      options:
+        - label: Tried host bypass with the same routing.
+        - label: Tried the same host path without ArSonComp.

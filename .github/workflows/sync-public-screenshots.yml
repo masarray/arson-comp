@@ -1,0 +1,61 @@
+name: Import verified GUI screenshots
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - README.md
+      - docs/PRODUCT-SHOWCASE.md
+      - .github/workflows/sync-public-screenshots.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  screenshots:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'docs/m8-public-showcase'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/m8-public-showcase
+          persist-credentials: true
+      - name: Retrieve screenshot images from successful JUCE Windows CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: "41267899861"
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="$RUNNER_TEMP/arsoncomp-screenshot-source"
+          mkdir -p "$source_dir" docs/images
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name ArSonComp-Windows-x64-ReadyToTest --dir "$source_dir"
+          grep -F "actions/runs/$SOURCE_RUN" "$source_dir/BUILD-INFO.txt"
+          test -s "$source_dir/Plugin/ArSonComp.vst3/Contents/x86_64-win/ArSonComp.vst3"
+          cp "$source_dir/Screenshots/ArSonComp-preview.png" docs/images/arsoncomp-full.png
+          cp "$source_dir/Screenshots/ArSonComp-preview-minimum.png" docs/images/arsoncomp-minimum.png
+          cp "$source_dir/Screenshots/ArSonComp-preview-sidechain.png" docs/images/arsoncomp-sidechain.png
+          cp "$source_dir/Screenshots/ArSonComp-preview-compact.png" docs/images/arsoncomp-mini.png
+          cp "$source_dir/Screenshots/ArSonComp-preview-browser.png" docs/images/arsoncomp-presets.png
+          for png in docs/images/arsoncomp-*.png; do
+            test -s "$png"
+            file "$png" | grep -q "PNG image data"
+            echo "Verified screenshot: $(basename "$png") ($(wc -c < "$png") bytes)"
+          done
+      - name: Save real screenshots in public PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add docs/images/arsoncomp-*.png
+          if git diff --cached --quiet; then
+            echo "All screenshots already match the source CI run"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs: embed actual M7 Windows JUCE screenshots"
+          git push origin HEAD:docs/m8-public-showcase

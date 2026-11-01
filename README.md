@@ -1,57 +1,74 @@
 # ArSonComp
 
-ArSonComp is a lightweight real-time dynamics compressor for vocals,
-karaoke, streaming and music, written in C++17 with a reusable JUCE-free
-audio engine and a JUCE 8 VST3/Standalone interface.
+**Real-time dynamics for vocals, music, podcasts, streaming, and live mixing.**
 
-## Download for Windows, Linux and macOS
+[![Cross-platform packages](https://github.com/masarray/arson-comp/actions/workflows/release-installers.yml/badge.svg)](https://github.com/masarray/arson-comp/actions/workflows/release-installers.yml)
+[![Tests](https://github.com/masarray/arson-comp/actions/workflows/build.yml/badge.svg)](https://github.com/masarray/arson-comp/actions/workflows/build.yml)
+[![Release Candidate](https://img.shields.io/badge/release-v0.2.0--rc.1-orange)](https://github.com/masarray/arson-comp/releases/tag/v0.2.0-rc.1)
+[![AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
-**[GitHub Releases](https://github.com/masarray/arson-comp/releases)**
+ArSonComp is an open-source compressor built with a reusable C++17 DSP engine and JUCE 8 interface. Use it as a **VST3 plug-in** in your DAW/mixer or run it **Standalone**. The default signal path introduces **zero algorithmic samples of latency**; audio-interface, driver, and host-buffer latency still exist.
 
-- **Windows 10/11 x64:** Inno Setup EXE. Choose *Just me* (no admin) or
-  *All users*. Installs VST3 and Standalone by default, Start Menu/uninstaller.
-- **Ubuntu/Debian x86_64:** DEB installer with VST3 and Standalone.
-- **Other desktop Linux x86_64:** portable archive with no-sudo
-  per-user install/uninstall scripts.
-- **macOS Apple Silicon + Intel:** universal VST3 and Standalone in a PKG.
-  Ad-hoc code signed; unsigned/not-notarized PKG may trigger Gatekeeper.
+<p align="center">
+  <a href="docs/images/arsoncomp-full.png"><img src="docs/images/arsoncomp-full.png" width="612" alt="Real ArSonComp Windows JUCE screenshot showing a large dark transfer and live history graph, stereo level meters, compact silver hardware-style knobs, and a brushed-metal chassis."></a>
+</p>
+<p align="center"><sub>Actual Windows JUCE editor screenshot from M7 • Full mode 612 × 580</sub></p>
 
-See [installer guide](docs/INSTALL-PUBLIC.md) for exact steps, install
-locations, limitations and Mac security instructions.
+## Get ArSonComp
 
-### Features
+**[Download v0.2.0-rc.1 — official GitHub Release](https://github.com/masarray/arson-comp/releases/tag/v0.2.0-rc.1)**
 
-Original Clean/Feedback/Smooth causal compressor styles; Peak/RMS detection;
-external mono/stereo sidechain, adjustable detector HP/LP, wet/dry Mix,
-Auto Release, adjustable Range, stereo Link and sidechain listen.
-46 original factory presets, user preset Save/Open, A/B, APVTS automation
-and project restore. The compact 612×580 full GUI has a tall black-glass
-transfer/history/meter LCD, brushed graphite chassis and approved silver
-hardware-style sliders. MINI and separate Dynamics/Sidechain panels are
-available. The host reports **zero additional algorithmic samples**;
-actual audio device/driver round-trip latency is separate.
+| Operating system | One-click / recommended package | Installer behavior |
+| --- | --- | --- |
+| **Windows 10/11 x64** | [Inno Setup EXE](https://github.com/masarray/arson-comp/releases/download/v0.2.0-rc.1/ArSonComp-0.2.0-Windows-x64-Setup.exe) | VST3 + Standalone; per-user or all-users; uninstall support |
+| **Ubuntu / Debian x86_64** | [DEB package](https://github.com/masarray/arson-comp/releases/download/v0.2.0-rc.1/ArSonComp-0.2.0-Ubuntu-Debian-amd64.deb) | Install through system Software Center |
+| **Other desktop Linux x86_64** | [Portable tar.gz](https://github.com/masarray/arson-comp/releases/download/v0.2.0-rc.1/ArSonComp-0.2.0-Linux-x86_64-Portable.tar.gz) | Per-user install/uninstall scripts, no sudo |
+| **macOS 11+ · Intel and Apple Silicon** | [Universal PKG](https://github.com/masarray/arson-comp/releases/download/v0.2.0-rc.1/ArSonComp-0.2.0-macOS-Universal-AdHoc.pkg) | VST3 + Standalone; ad-hoc signed, **not notarized** |
 
-### Platform verification and releases
+[macOS VST3-only ZIP](https://github.com/masarray/arson-comp/releases/download/v0.2.0-rc.1/ArSonComp-0.2.0-macOS-VST3-Universal.zip) · [SHA-256 checksums](https://github.com/masarray/arson-comp/releases/download/v0.2.0-rc.1/SHA256SUMS.txt) · [Installation guide](docs/INSTALL-PUBLIC.md)
 
-The cross-platform release workflow builds VST3 and Standalone on Windows,
-Linux and macOS, performs automated engine/editor smoke tests, creates
-Inno Setup / DEB / portable archive / ad-hoc PKG, and publishes SHA-256
-manifests. The initial public tag is a **release candidate** until physical
-DAW and audio-interface results, ASIO/JUCE licensing review and (for
-frictionless Mac distribution) Developer ID notarization are complete.
-A public CI artifact alone is not certified production-stable.
+After installing, restart/rescan your VST3 host and look for **ArSonComp**. The Mac installer may show Gatekeeper warnings because it is not Apple notarized. Do not disable Gatekeeper globally.
 
-See [Windows physical test quickstart](docs/WINDOWS-QUICKSTART.md),
-[hardware readiness](docs/M7-PHYSICAL-READINESS.md), and
-[validation](docs/VALIDATION.md). Real-device Maono PS22 crackles/underruns,
-32/64/128 buffers, multiple hosts, pluginval, long-session memory and
-loudness-matched quality are separate release gates.
+## Why ArSonComp
 
-### Build locally
+- **Three original causal compressor models:** Clean, Feedback and Smooth.
+- **Useful dynamics:** Threshold, Ratio, Knee, Attack, Hold, Release, Range, Input, Makeup, stereo Link and parallel Mix.
+- **Flexible detector:** Peak/RMS, mono/stereo external sidechain, HP/LP detector filtering, and Listen SC.
+- **See what's happening:** live compression transfer/history LCD with independent input, gain reduction and output meters.
+- **Fast preset workflow:** 46 original factory presets, categorized search, favorites, A/B, user Save/Open, host automation and state recall.
+- **Live-friendly UI:** Full/MINI modes and separate Dynamics/Sidechain pages; matte graphite brushed-metal body, silver control artwork.
+- **Real-time DSP:** framework-independent core, bounded telemetry queue, no GUI work or filesystem operations in the audio callback.
 
-CMake 3.22+, C++17, JUCE 8.0.12 pinned to a verified commit.
-Visual Studio 2022 C++ Desktop on Windows; Xcode on macOS; JUCE Linux
-dependencies from [JUCE official documentation](https://github.com/juce-framework/JUCE/blob/master/docs/Linux%20Dependencies.md).
+## Screenshots — real software, not concept art
+
+| Dynamics at minimum size | Sidechain controls |
+| :---: | :---: |
+| [![Minimum GUI](docs/images/arsoncomp-minimum.png)](docs/images/arsoncomp-minimum.png) | [![Sidechain GUI](docs/images/arsoncomp-sidechain.png)](docs/images/arsoncomp-sidechain.png) |
+
+| MINI workflow | Factory preset browser |
+| :---: | :---: |
+| [![MINI layout](docs/images/arsoncomp-mini.png)](docs/images/arsoncomp-mini.png) | [![Preset browser](docs/images/arsoncomp-presets.png)](docs/images/arsoncomp-presets.png) |
+
+[Open the full GUI gallery and screenshot provenance](docs/PRODUCT-SHOWCASE.md).
+
+## First sound
+
+1. Insert the VST3 on a vocal/music channel, or open Standalone and configure the real input/output device.
+2. Choose **Clean**, start around **2:1**, and lower Threshold until the GR meter shows roughly **3–6 dB**.
+3. Adjust Makeup for safe output headroom. Compare Active and Bypass at similar perceived loudness.
+4. Enable Sidechain only when detector filtering or an external signal is needed.
+
+Start physical audio testing at **48 kHz / 128 samples** and move to 64/32 only when stable. See the [hardware test guide](docs/WINDOWS-QUICKSTART.md).
+
+## Release quality and transparency
+
+**v0.2.0-rc.1 is a public Release Candidate — not a certified production-stable audio release.** The [cross-platform CI run](https://github.com/masarray/arson-comp/actions/runs/41273600039) passed Windows, Linux and macOS builds/tests/packaging. CI does not prove glitch-free audio on physical interfaces or all DAWs, independent pluginval certification, commercially matched sound quality, or notarized macOS installation.
+
+[Current release status](docs/RELEASE-STATUS.md) · [Validation record](docs/VALIDATION.md) · [Architecture](docs/ARD.md) · [Report a problem](https://github.com/masarray/arson-comp/issues/new/choose) · [Contributing](CONTRIBUTING.md)
+
+## Build and licensing
+
+Requires CMake 3.22+, C++17 and JUCE 8.0.12 pinned to a verified commit. Visual Studio 2022 (Windows), Xcode (macOS), or [JUCE Linux dependencies](https://github.com/juce-framework/JUCE/blob/master/docs/Linux%20Dependencies.md).
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -59,14 +76,8 @@ cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
 ```
 
-Windows Visual Studio uses `cmake -S . -B build -A x64` and
-`cmake --build build --config Release`. The Windows Standalone enables
-native ASIO by default; review the Steinberg SDK terms when redistributing.
+For Visual Studio use `cmake -S . -B build -A x64` and build/test with `--config Release`.
 
-### License and compliance
+License: [AGPL-3.0](LICENSE). Respect JUCE and Steinberg ASIO licensing/redistribution requirements. ArSonComp's source, DSP and GUI are original; references to other commercial compressors indicate design goals, **not** sonic equivalence or affiliation.
 
-ArSonComp is AGPL-3.0 licensed; JUCE has its own AGPL/commercial licensing
-terms. The Windows Standalone includes Steinberg ASIO SDK-related code
-when ARSON_WINDOWS_ASIO=ON. Review its SDK redistribution terms for any
-public binary release. No FabFilter code/graphics/algorithms are copied,
-and equal sound quality with commercial software is not claimed.
+Built by [ArSon Audio](https://github.com/masarray).
