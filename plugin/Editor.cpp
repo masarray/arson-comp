@@ -6,6 +6,7 @@
 #include "GraphHistory.h"
 #include "HeaderLayout.h"
 #include "FaderGeometry.h"
+#include "KnobGeometry.h"
 #include "BinaryData.h"
 #include <cmath>
 #include <algorithm>
@@ -51,15 +52,6 @@ CompLook::CompLook() {
         static_cast<std::size_t>(BinaryData::arson_toggle_off_pngSize));
     jassert(toggleOn.isValid() && toggleOff.isValid());
     jassert(toggleOn.getBounds()==toggleOff.getBounds());
-    // Two light-weight, transparent gunmetal assets are decoded once,
-    // exclusively on the GUI thread; no file I/O or decoding in paint().
-    sliderTrack=juce::ImageFileFormat::loadFrom(
-        BinaryData::gunmetal_slider_track_png,
-        static_cast<std::size_t>(BinaryData::gunmetal_slider_track_pngSize));
-    sliderThumb=juce::ImageFileFormat::loadFrom(
-        BinaryData::gunmetal_slider_thumb_red_png,
-        static_cast<std::size_t>(BinaryData::gunmetal_slider_thumb_red_pngSize));
-    jassert(sliderTrack.isValid() && sliderThumb.isValid());
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colour{0xff31383e});
@@ -166,17 +158,14 @@ const juce::Image& CompLook::knobFace(int diameter,bool primary) {
 void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float start,float end,juce::Slider& slider) {
     const bool primary=slider.getName()=="Threshold";
-    const float r=std::max(13.0f,std::min(
-        static_cast<float>(w)*(primary?0.400f:0.385f),
-        static_cast<float>(h)*(primary?0.400f:0.385f)));
-    const int pixels=juce::jmax(28,static_cast<int>(std::ceil(r*2.0f+7.0f)));
+    const int pixels=arson::ui::KnobGeometry::facePixels(w,h,primary);
     const float cx=x+w*0.5f,cy=y+h*0.50f;
     const float angle=start+clamp01(pos)*(end-start);
     const float bodyRadius=pixels*0.5f;
     // Draw the level RING FIRST. Its radius is larger than the black metal
     // photograph, so the dial occludes the inner arc naturally, as a physical
     // knob would. Nothing gets painted on top of the metal except the dot.
-    const float trackRadius=bodyRadius+2.2f;
+    const float trackRadius=bodyRadius+arson::ui::KnobGeometry::arcOutsideFace;
     juce::Path inactive,active;
     inactive.addCentredArc(cx,cy,trackRadius,trackRadius,0.0f,start,end,true);
     active.addCentredArc(cx,cy,trackRadius,trackRadius,0.0f,start,angle,true);
@@ -205,9 +194,8 @@ void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
 void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float,float,
                                  const juce::Slider::SliderStyle,juce::Slider&) {
-    // Draw the *whole* 340x57 track and the 58x124 thumb at the SAME
-    // proportional scale. A resized window changes size, not aspect ratio.
-    // All geometry is float arithmetic; there is no allocation/cache churn.
+    // Modern vector-only JUCE fader; no texture, sprite or image resampling.
+    // Host automation, keyboard input and gestures remain native JUCE Slider.
     const auto geometry=arson::ui::FaderGeometry::calculate(
         static_cast<float>(w),static_cast<float>(h),pos);
     const auto track=geometry.track.translated(static_cast<float>(x),
@@ -215,71 +203,62 @@ void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
     const auto thumb=geometry.thumb.translated(static_cast<float>(x),
                                                static_cast<float>(y));
     const float cy=static_cast<float>(y)+static_cast<float>(h)*0.5f;
-    const float left=geometry.left+static_cast<float>(x);
-    const float right=geometry.right+static_cast<float>(x);
-    const float position=geometry.position+static_cast<float>(x);
-    // The native track art is intentionally ~6:1. At an 85px control
-    // it becomes just 14px tall. A bounded *independent* metal housing
-    // restores the physical fader's depth without stretching either PNG.
-    // All geometry stays within the component; no image/cache allocation.
-    const float housingH=juce::jmin(23.0f,static_cast<float>(h)-6.0f);
-    const auto housing=juce::Rectangle<float>{
-        track.getX()-3.0f,cy-housingH*0.5f,track.getWidth()+6.0f,housingH};
-    g.setColour(juce::Colour{0xff262c31});
-    g.fillRoundedRectangle(housing,4.5f);
-    g.setColour(juce::Colour{0xff717a80}.withAlpha(0.42f));
-    g.drawRoundedRectangle(housing.reduced(0.5f),4.5f,0.9f);
-    g.setColour(juce::Colours::white.withAlpha(0.085f));
-    g.drawHorizontalLine(juce::roundToInt(housing.getY()+2.5f),
-        housing.getX()+5.0f,housing.getRight()-5.0f);
-    if(sliderTrack.isValid()) {
-        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImage(sliderTrack,track);
-    } else {
-        g.setColour(juce::Colour{0xff292f33});
-        g.fillRoundedRectangle(track,track.getHeight()*0.35f);
-    }
-    // Recessed LED level remains clipped inside the proportional track
-    // and always uses the same thumb travel. Minimum has no red fill.
-    if(position>left+0.3f) {
-        juce::Graphics::ScopedSaveState scope(g);
-        const float ledH=juce::jmax(3.0f,track.getHeight()*0.29f);
-        const float ledY=cy-ledH*0.5f;
-        juce::Path recess;
-        recess.addRoundedRectangle(left,ledY,right-left,ledH,ledH*0.45f);
-        g.reduceClipRegion(recess);
+    const float progress=juce::jlimit(0.0f,1.0f,
+        (geometry.position-geometry.left)/(geometry.right-geometry.left));
+
+    // Inset charcoal rail: restrained outline, clear separation from chassis.
+    const auto housing=track.expanded(1.4f,2.6f);
+    g.setColour(juce::Colour{0xff11171b});
+    g.fillRoundedRectangle(housing,4.2f);
+    g.setColour(juce::Colour{0xff6e777c}.withAlpha(0.43f));
+    g.drawRoundedRectangle(housing.reduced(0.35f),4.0f,0.85f);
+    g.setColour(juce::Colour{0xff070c10});
+    g.fillRoundedRectangle(track,track.getHeight()*0.5f);
+    g.setColour(juce::Colour{0xff9ba4a8}.withAlpha(0.15f));
+    g.drawHorizontalLine(juce::roundToInt(track.getY()+1.0f),
+        track.getX()+3.0f,track.getRight()-3.0f);
+
+    // Coral level fill, clipped into rounded channel. Minimum is fully dark.
+    if(progress>0.001f) {
+        juce::Graphics::ScopedSaveState clip(g);
+        juce::Path channel;
+        channel.addRoundedRectangle(track,track.getHeight()*0.5f);
+        g.reduceClipRegion(channel);
+        const float litRight=track.getX()+track.getWidth()*progress;
         g.setGradientFill(juce::ColourGradient(
-            juce::Colour{0xffff6b79},left,ledY,
-            juce::Colour{0xff9e2433},left,ledY+ledH,false));
-        g.fillRect(left,ledY,position-left,ledH);
-        g.setColour(juce::Colour{0xffffb0b6}.withAlpha(0.46f));
-        g.fillRect(left,cy-0.55f,position-left,1.1f);
+            juce::Colour{0xfffc8587},track.getX(),track.getY(),
+            juce::Colour{0xffb33b4d},track.getX(),track.getBottom(),false));
+        g.fillRect(track.getX(),track.getY(),
+                   litRight-track.getX(),track.getHeight());
+        if(litRight>track.getX()+4.0f) {
+            g.setColour(juce::Colour{0xffffd1cf}.withAlpha(0.43f));
+            g.drawHorizontalLine(juce::roundToInt(cy-0.5f),
+                track.getX()+2.0f,litRight-1.0f);
+        }
     }
-    // A proportional photographic thumb is too dark against the new chassis
-    // at 580-612px. Give it a bright metal silhouette and a tactile centre
-    // marker UNDER/OVER the original asset (never stretch or replace it).
-    // This makes the current value visible even when the LED fill is zero.
-    const auto thumbBack=thumb.expanded(1.2f,0.4f);
-    g.setColour(juce::Colour{0xffabb6bb});
-    g.fillRoundedRectangle(thumbBack,2.5f);
-    g.setColour(juce::Colour{0xff11181c});
-    g.fillRoundedRectangle(thumbBack.reduced(1.1f),2.0f);
-    if(sliderThumb.isValid()) {
-        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImage(sliderThumb,thumb);
-    } else {
-        g.setColour(juce::Colour{0xff929fa5});
-        g.fillRoundedRectangle(thumb,2.5f);
-    }
-    // Draw a narrow light-catching ridge over the image. The centre marker
-    // must move with thumb at both extremes and at all supported widths.
-    const float ridgeX=thumb.getCentreX();
-    g.setColour(juce::Colour{0xffc8d0d2}.withAlpha(0.9f));
-    g.drawVerticalLine(juce::roundToInt(ridgeX),thumb.getY()+3.0f,
-                       thumb.getBottom()-3.0f);
-    g.setColour(juce::Colour{0xff5f6a70}.withAlpha(0.8f));
-    g.drawVerticalLine(juce::roundToInt(ridgeX+2.0f),
-                       thumb.getY()+4.0f,thumb.getBottom()-4.0f);
+
+    // Sharp graphite thumb with soft satin bevel + small red engraved grip.
+    // At actual 34px height the thumb remains 13-15px wide and 28px tall.
+    g.setColour(juce::Colours::black.withAlpha(0.48f));
+    g.fillRoundedRectangle(thumb.translated(0.0f,1.4f),3.2f);
+    juce::ColourGradient brushed(juce::Colour{0xff869198},thumb.getX(),cy,
+                                 juce::Colour{0xff414a51},thumb.getRight(),cy,false);
+    brushed.addColour(0.19,juce::Colour{0xff707c83});
+    brushed.addColour(0.40,juce::Colour{0xff333c43});
+    brushed.addColour(0.73,juce::Colour{0xff222b31});
+    g.setGradientFill(brushed);
+    g.fillRoundedRectangle(thumb,3.1f);
+    g.setColour(juce::Colour{0xffa3adb2}.withAlpha(0.62f));
+    g.drawRoundedRectangle(thumb.reduced(0.7f),2.6f,0.85f);
+    g.setColour(juce::Colours::white.withAlpha(0.10f));
+    g.drawVerticalLine(juce::roundToInt(thumb.getX()+2.1f),
+        thumb.getY()+4.0f,thumb.getBottom()-4.0f);
+    const juce::Rectangle<float> grip{
+        thumb.getX()+3.1f,cy-1.2f,thumb.getWidth()-6.2f,2.4f};
+    g.setColour(juce::Colour{0xff141a1f});
+    g.fillRoundedRectangle(grip.expanded(0.4f,0.65f),1.25f);
+    g.setColour(juce::Colour{0xffed7279});
+    g.fillRoundedRectangle(grip,1.2f);
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
                                  bool highlighted,bool down) {
@@ -317,7 +296,7 @@ Editor::Editor(Processor& p):AudioProcessorEditor(p),processor(p),alternate(p.sn
     setLookAndFeel(&look);
     setOpaque(true);
     // Crisp vector-font wordmark replaces a low-contrast bitmap in the
-    // tight 88px header; photo knob/slider assets remain predecoded.
+    // tight 88px header; knob assets remain predecoded; the faders are fully vector painted.
     const std::array<std::size_t,6> bars{{arson::Range,arson::Hold,arson::Mix,
         arson::Link,arson::Highpass,arson::Lowpass}};
     for(std::size_t i=0;i<knobs.size();++i) {

@@ -22,7 +22,6 @@ private:
     std::array<FaceCache,2> faces; // normal + oversized Threshold only
     juce::Image sourceFace; // decoded once on GUI initialization
     juce::Image toggleOn, toggleOff; // matched, predecoded state sprites
-    juce::Image sliderTrack, sliderThumb; // layered photographic gunmetal assets, decoded once
     const juce::Image& knobFace(int diameter,bool primary);
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {
@@ -118,7 +117,7 @@ private:
     juce::String currentPresetTitle{"Custom / restored"};
     bool alternateActive=false;
     bool compactMode=false,thresholdDragging=false,sidechainPanel=false;
-    int expandedWidth=612,expandedHeight=500;
+    int expandedWidth=612,expandedHeight=580;
     std::array<arson::MeterFrame,400> history{};
     std::size_t head=0;
     float inputDb=-120,outputDb=-120,gr=0;
