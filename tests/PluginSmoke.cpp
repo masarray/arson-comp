@@ -252,12 +252,17 @@ static int runSmoke(int argc,char** argv) {
         {
             CompLook look;
             juce::Image paintTest(juce::Image::ARGB,100,34,true);
-            juce::Graphics faderGraphics(paintTest);
-            faderGraphics.fillAll(juce::Colour{0xff262c31});
-            juce::Slider dummy;
+            // End the Graphics lifetime before inspecting pixels. JUCE image
+            // backends may defer drawing while the graphics context is live;
+            // reading at that point returned transparent black on Windows.
+            {
+                juce::Graphics faderGraphics(paintTest);
+                faderGraphics.fillAll(juce::Colour{0xff262c31});
+                juce::Slider dummy;
+                look.drawLinearSlider(faderGraphics,0,0,100,34,55.0f,0.0f,100.0f,
+                                      juce::Slider::LinearHorizontal,dummy);
+            }
             const auto geom=arson::ui::FaderGeometry::calculate(100.0f,34.0f,55.0f);
-            look.drawLinearSlider(faderGraphics,0,0,100,34,55.0f,0.0f,100.0f,
-                                  juce::Slider::LinearHorizontal,dummy);
             const int sampleX=juce::roundToInt(geom.position)-4;
             const auto polishedEdge=paintTest.getPixelAt(sampleX,12);
             const auto chassis=paintTest.getPixelAt(sampleX-17,12);
