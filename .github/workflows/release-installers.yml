@@ -1,10 +1,7 @@
 name: Build public installers
+# Packaging and publishing are explicit: docs/site edits must never
+# trigger an expensive 3-OS rebuild or attempt to overwrite an existing tag.
 on:
-  pull_request:
-    paths: ['CMakeLists.txt', 'packaging/**', 'docs/INSTALL-PUBLIC.md', '.github/workflows/release-installers.yml']
-  push:
-    branches: [main]
-    paths: ['CMakeLists.txt', 'packaging/**', 'docs/INSTALL-PUBLIC.md', '.github/workflows/release-installers.yml']
   workflow_dispatch:
     inputs:
       publish:
@@ -113,8 +110,7 @@ jobs:
   publish:
     needs: [windows, linux, macos]
     if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && inputs.publish)
+      github.event_name == 'workflow_dispatch' && inputs.publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
