@@ -58,8 +58,8 @@ jobs:
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true' EXIT
           sleep 2
-          "$browser" --headless --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=2000             --screenshot=preview/desktop-1440.png --window-size=1440,2600 http://127.0.0.1:8766/ >/tmp/arson-chrome.log 2>&1
-          "$browser" --headless --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=2000             --screenshot=preview/mobile-390.png --window-size=390,2500 http://127.0.0.1:8766/ >>/tmp/arson-chrome.log 2>&1
+          "$browser" --headless --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=9000             --screenshot=preview/desktop-1440.png --window-size=1440,5200 http://127.0.0.1:8766/ >/tmp/arson-chrome.log 2>&1
+          "$browser" --headless --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=9000             --screenshot=preview/mobile-390.png --window-size=390,5200 http://127.0.0.1:8766/ >>/tmp/arson-chrome.log 2>&1
           test -s preview/desktop-1440.png
           test -s preview/mobile-390.png
       - name: Upload website visual QA
