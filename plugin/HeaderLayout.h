@@ -7,11 +7,11 @@ namespace arson::ui {
 // Keep actual controls comfortably sized; remove blank canvas before scaling
 // text/knobs down. Reused by the editor renderer and the Windows smoke tests.
 struct EditorMetrics {
-    // Dense-but-usable hardware UI: 612px default instead of 704px.
+    // Narrow 612px chassis with taller LCD; full 612x580, minimum 580x540.
     // Main knobs retain 58px hit targets and readable 10.4pt captions.
-    static constexpr int minWidth=580, minHeight=480;
-    static constexpr int defaultWidth=612, defaultHeight=500;
-    static constexpr int maxWidth=1000, maxHeight=760;
+    static constexpr int minWidth=580, minHeight=540;
+    static constexpr int defaultWidth=612, defaultHeight=580;
+    static constexpr int maxWidth=1000, maxHeight=820;
     static constexpr int miniHeight=320;
     static constexpr int headerHeight=62, displayTop=64;
     static constexpr int displayBottomReserve=254;
