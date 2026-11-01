@@ -1,6 +1,6 @@
 # Changelog
 
-This file summarizes meaningful **user-facing** milestones. It does not imply that the current public release is production-stable.
+This file summarizes meaningful user-facing milestones. Public v0.2.0 is Stable by explicit owner approval and verified reuse of the previously tested release binaries; it is not independent cross-DAW certification.
 
 ## [Unreleased] — documentation and web readiness
 
@@ -8,6 +8,13 @@ This file summarizes meaningful **user-facing** milestones. It does not imply th
 - Use five verified screenshots from the actual Windows JUCE editor.
 - Add a professional product README, contribution templates and clear Release Candidate notices.
 - Improve onboarding, privacy/support transparency, security reporting and website integrity checks. These updates do **not** rebuild or change the published v0.2.0-rc.1 audio binaries.
+
+## [0.2.0] — 2026-11-01 · Stable
+
+- Promoted tested v0.2.0-rc.1 binaries to public Stable following owner-confirmed physical evaluation.
+- Reused all five platform installer packages without rebuilding, verified against the original SHA-256 manifest.
+- Windows Inno Setup, Linux DEB/portable, and macOS Universal ad-hoc PKG/VST3 are available for direct public download.
+- macOS is still not Apple notarized; deeper third-party host/certification evidence remains ongoing.
 
 ## [0.2.0-rc.1] — 2026-11-01
 
@@ -30,3 +37,5 @@ First public installable **Release Candidate**; [release assets and SHA-256 mani
 The authoritative long-form history is in [engineering validation](docs/VALIDATION.md) and [release status](docs/RELEASE-STATUS.md).
 
 [0.2.0-rc.1]: https://github.com/masarray/arson-comp/releases/tag/v0.2.0-rc.1
+
+[0.2.0]: https://github.com/masarray/arson-comp/releases/tag/v0.2.0

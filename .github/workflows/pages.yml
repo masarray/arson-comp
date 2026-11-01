@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          release="repos/$GITHUB_REPOSITORY/releases/tags/v0.2.0-rc.1"
+          release="repos/$GITHUB_REPOSITORY/releases/tags/v0.2.0"
           gh api "$release" --jq '.assets[].name' | sort > /tmp/arson-release-assets.txt
           for name in \
             ArSonComp-0.2.0-Windows-x64-Setup.exe \

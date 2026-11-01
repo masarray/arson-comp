@@ -1,6 +1,6 @@
 # ArSonComp M7 — Windows x64 physical test quickstart
 
-This is an engineering **test build**, not a public production release.
+These steps are a **physical verification procedure** for publicly released v0.2.0 Stable. The owner reports having tested the product; the template remains useful for collecting detailed host/driver compatibility evidence.
 The exact commit is in `BUILD-INFO.txt`; `SHA256SUMS.txt` lists binary hashes.
 The compressor adds zero **algorithmic sample** latency, not zero hardware
 round-trip/host/driver latency. Do not assume Maono PS22 stability from CI.

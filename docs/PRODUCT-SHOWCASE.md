@@ -1,6 +1,6 @@
 # ArSonComp — interface gallery
 
-All images below are **actual screenshots captured by the Windows JUCE editor smoke test**, not AI illustrations or visual mockups. The latest interface-changing source is M7; the subsequent v0.2.0-rc.1 installer work did not change the GUI.
+All images below are **actual screenshots captured by the Windows JUCE editor smoke test**, not AI illustrations or visual mockups. The latest interface-changing source is M7; the subsequent v0.2.0 installer work did not change the GUI.
 
 **Provenance:** [Windows run #41267899861](https://github.com/masarray/arson-comp/actions/runs/41267899861), which includes the test executable and screenshot bundle.
 

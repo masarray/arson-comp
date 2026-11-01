@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  const latest = "https://github.com/masarray/arson-comp/releases/download/v0.2.0-rc.1/";
+  const latest = "https://github.com/masarray/arson-comp/releases/download/v0.2.0/";
   const downloads = {
     windows: latest + "ArSonComp-0.2.0-Windows-x64-Setup.exe",
     macos: latest + "ArSonComp-0.2.0-macOS-Universal-AdHoc.pkg"

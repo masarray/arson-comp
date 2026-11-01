@@ -53,7 +53,7 @@ parity with commercial compressors. Use Windows START-HERE and the
 M7 field-test checklist for the Maono PS22 / ASIO hardware gate.
 For open-source distribution, keep AGPL source accessible and review
 JUCE AGPL/commercial terms plus Steinberg ASIO SDK redistribution
-requirements before labeling a distribution production-stable.
+requirements remain important even for an owner-approved Stable release. The user-confirmed physical test is not a substitute for independent licensing review.
 
 Official VST3 standard installation locations:
 https://steinbergmedia.github.io/vst3_dev_portal/pages/Technical%2BDocumentation/Locations%2BFormat/Plugin%2BLocations.html

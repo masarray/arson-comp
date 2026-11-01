@@ -1,26 +1,29 @@
-# Release status — ArSonComp v0.2.0-rc.1
+# Release status — ArSonComp v0.2.0 Stable
 
-**Public release:** [v0.2.0-rc.1](https://github.com/masarray/arson-comp/releases/tag/v0.2.0-rc.1)  
-**Release commit:** `0a039ef6d340e26aa01a62df3670f74da1f03a12`  
-**Installer CI:** [Run #41273600039](https://github.com/masarray/arson-comp/actions/runs/41273600039)  
-**Most recent GUI screenshots:** [M7 Windows run #41267899861](https://github.com/masarray/arson-comp/actions/runs/41267899861)
+**Current public release:** [v0.2.0 Stable](https://github.com/masarray/arson-comp/releases/tag/v0.2.0)  
+**Source tag / verified binary commit:** `0a039ef6d340e26aa01a62df3670f74da1f03a12`  
+**Cross-platform build and installer CI:** [Run #41273600039](https://github.com/masarray/arson-comp/actions/runs/41273600039)  
+**Owner-authorized byte-identical RC → Stable promotion:** [Run #41286912535](https://github.com/masarray/arson-comp/actions/runs/41286912535)  
+**GUI screenshot provenance:** [M7 Windows run #41267899861](https://github.com/masarray/arson-comp/actions/runs/41267899861)
 
-## Automated checks completed
+## Release status: Stable by owner acceptance
 
-- Windows x64 VST3 and Standalone compiled, JUCE/editor and DSP tests passed, and the Inno Setup EXE was produced.
-- Ubuntu x86_64 compiled, executed tests under a virtual display, and produced DEB and portable archives.
-- macOS arm64 + x86_64 universal build and tests completed, ad-hoc signing and signature verification passed, and universal PKG/VST3 archive were produced.
-- Public prerelease assets and SHA-256 checksums were published.
+The product owner explicitly confirmed that ArSonComp had been physically tested and directed publication as a Stable release. Stable packaging reuses the **same five installer binaries** as v0.2.0-rc.1; all package hashes match the earlier manifest. The release tag points to the original code commit that produced these binaries; latest website/documentation continues on `main`.
 
-## Evidence still required before a production-stable label
+This records the owner's release decision. It does **not** imply that we independently observed hardware xrun measurements or certified every third-party DAW.
 
-- Verify with pluginval and two independent real VST3 hosts on target operating systems.
-- Measure physical-driver callback timing, xruns and sustained performance at 48 kHz / 128, 64 and 32 samples; validate a 60-minute session.
-- Record actual Maono PS22 ASIO behavior with bypass/on A/B/C/D isolation, rather than infer it from CPU utilization.
-- Validate project restore, external sidechain routing, automation and editor open/close in installed hosts.
-- Conduct loudness-matched audio quality comparisons; no verified FabFilter sonic equivalence.
-- Review JUCE/ASIO SDK redistribution terms; Apple Developer ID and notarization remain needed for frictionless macOS installation.
+## Verified automated distribution
 
-**Public availability and successful CI are not the same as production-stable audio certification.** This version is intentionally labelled a *Release Candidate* until physical and host-level gates are complete.
+- Windows 10/11 x64: VST3/Standalone and Inno Setup.
+- Ubuntu/Debian x86_64: DEB, plus portable Linux x86_64.
+- macOS Intel and Apple Silicon: universal application/VST3, ad-hoc signed PKG and VST3 ZIP (PKG **not Apple notarized**).
+- Smoke tests and automated build/package CI passed on all three platforms; release carries a SHA-256 manifest.
 
-[Installation guide](INSTALL-PUBLIC.md) · [Windows physical test](WINDOWS-QUICKSTART.md) · [Validation archive](VALIDATION.md).
+## Known limitations and follow-up
+
+- macOS Gatekeeper may warn because the installer is unsigned/not notarized; do not disable Gatekeeper globally.
+- Third-party pluginval, detailed DAW interoperability, documented physical driver/xrun logs, and licensing/redistribution review remain follow-up evidence items, not claims of completed independent certification.
+- Commercial compressor sonic parity is not claimed; default zero **algorithmic sample** latency does not mean zero hardware/driver round-trip time.
+- [Ongoing compatibility and release QA](https://github.com/masarray/arson-comp/issues/18) remains open for evidence-based improvements.
+
+[Install guide](INSTALL-PUBLIC.md) · [QA checklist](RELEASE-CHECKLIST.md) · [Windows physical test procedure](WINDOWS-QUICKSTART.md).

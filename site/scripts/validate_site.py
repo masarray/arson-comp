@@ -12,7 +12,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
-RELEASE = "https://github.com/masarray/arson-comp/releases/download/v0.2.0-rc.1/"
+RELEASE = "https://github.com/masarray/arson-comp/releases/download/v0.2.0/"
 DOWNLOADS = (
     "ArSonComp-0.2.0-Windows-x64-Setup.exe",
     "ArSonComp-0.2.0-macOS-Universal-AdHoc.pkg",
@@ -88,8 +88,9 @@ def check() -> None:
 
     text = page_file.read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert "v0.2.0-rc.1" in text and "v0.2.0-rc.1" in js, "release mismatch"
-    assert "Release Candidate" in text and "not Apple notarized" in text, "honest RC/macOS messaging missing"
+    assert "v0.2.0" in text and "v0.2.0" in js, "release mismatch"
+    assert "v0.2.0 · Stable" in text and "not Apple notarized" in text, "stable/macOS notice missing"
+    assert "v0.2.0-rc.1" not in text and "v0.2.0-rc.1" not in js, "old RC link remains"
     for item in DOWNLOADS:
         assert RELEASE + item in text, "missing official release asset: " + item
     for item in DOWNLOADS[:2]:
