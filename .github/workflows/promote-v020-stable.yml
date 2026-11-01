@@ -1,0 +1,95 @@
+name: Publish ArSonComp Stable v0.2.0
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/promote-v020-stable.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arsoncomp-stable-v020
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Reuse and verify tested installers; publish stable
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_TAG: v0.2.0-rc.1
+      STABLE_TAG: v0.2.0
+      SOURCE_SHA: 0a039ef6d340e26aa01a62df3670f74da1f03a12
+    steps:
+      - name: Verify RC tag and download unchanged installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(gh api "repos/$GH_REPO/git/ref/tags/$SOURCE_TAG" --jq .object.sha)"
+          test "$actual" = "$SOURCE_SHA" || { echo "::error::Source SHA mismatch"; exit 10; }
+          if gh release view "$STABLE_TAG" >/dev/null 2>&1; then
+            echo "Stable already published, refusing to overwrite." 
+            exit 0
+          fi
+          mkdir -p dist
+          gh release download "$SOURCE_TAG" --dir dist
+          for file in \
+            ArSonComp-0.2.0-Windows-x64-Setup.exe \
+            ArSonComp-0.2.0-Ubuntu-Debian-amd64.deb \
+            ArSonComp-0.2.0-Linux-x86_64-Portable.tar.gz \
+            ArSonComp-0.2.0-macOS-Universal-AdHoc.pkg \
+            ArSonComp-0.2.0-macOS-VST3-Universal.zip \
+            SHA256SUMS.txt; do
+            test -s "dist/$file" || { echo "::error::Missing $file"; exit 11; }
+          done
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 6
+          ( cd dist && sha256sum -c SHA256SUMS.txt )
+          echo "SHA-256 PASS: reusing the precise RC binaries, no rebuild."
+
+      - name: Publish stable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$STABLE_TAG" >/dev/null 2>&1; then
+            echo "Stable already published."
+            exit 0
+          fi
+          cat > stable-notes.md <<'NOTES'
+          # ArSonComp v0.2.0 — Stable
+
+          Stable public release, promoted following the product owner's physical evaluation and successful automated Windows/Linux/macOS build and packaging checks.
+
+          All five installers are byte-for-byte identical to v0.2.0-rc.1 and passed the original SHA-256 manifest. No rebuild or re-encoding was performed.
+
+          - **Windows 10/11 x64**: guided Inno Setup EXE with VST3 + Standalone.
+          - **Ubuntu/Debian x86_64**: DEB installer.
+          - **Other desktop Linux x86_64**: portable tar.gz with user installation scripts.
+          - **macOS Universal (arm64/x86_64)**: ad-hoc signed PKG with VST3 + Standalone, plus VST3-only ZIP.
+
+          Download website: https://masarray.github.io/arson-comp/
+
+          **Known limitations:** macOS PKG is NOT Apple notarized and may show a Gatekeeper prompt. This stable label reflects owner approval, not certification of every DAW/driver, measured zero xruns on every physical setup, or verified sonic parity with commercial products. Review third-party JUCE/ASIO distribution conditions.
+
+          Source commit corresponding to these binaries: 0a039ef6d340e26aa01a62df3670f74da1f03a12 (AGPL-3.0). Updated documentation and website live on main. Check SHA256SUMS.txt before installing.
+          NOTES
+          gh release create "$STABLE_TAG" dist/* \
+            --target "$SOURCE_SHA" \
+            --title "ArSonComp v0.2.0 — Stable" \
+            --notes-file stable-notes.md \
+            --latest
+
+      - name: Verify stable tag and complete public release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO/releases/tags/$STABLE_TAG" --jq .prerelease)" = false
+          test "$(gh api "repos/$GH_REPO/releases/tags/$STABLE_TAG" --jq .draft)" = false
+          test "$(gh api "repos/$GH_REPO/releases/tags/$STABLE_TAG" --jq '.assets|length')" -eq 6
+          tag_sha="$(gh api "repos/$GH_REPO/git/ref/tags/$STABLE_TAG" --jq .object.sha)"
+          test "$tag_sha" = "$SOURCE_SHA"
+          echo "v0.2.0 Stable published; 6 assets; tag references tested source."
