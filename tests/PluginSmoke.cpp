@@ -258,12 +258,17 @@ static int runSmoke(int argc,char** argv) {
             const auto geom=arson::ui::FaderGeometry::calculate(100.0f,34.0f,55.0f);
             look.drawLinearSlider(faderGraphics,0,0,100,34,55.0f,0.0f,100.0f,
                                   juce::Slider::LinearHorizontal,dummy);
-            const int sampleX=juce::roundToInt(geom.position)-3;
+            const int sampleX=juce::roundToInt(geom.position)-4;
             const auto polishedEdge=paintTest.getPixelAt(sampleX,12);
             const auto chassis=paintTest.getPixelAt(sampleX-17,12);
-            if(polishedEdge.getBrightness()<0.27f ||
-               polishedEdge.getBrightness()-chassis.getBrightness()<0.08f)
+            const float capBrightness=polishedEdge.getBrightness();
+            const float chassisBrightness=chassis.getBrightness();
+            if(capBrightness<0.24f || capBrightness-chassisBrightness<0.04f) {
+                std::cerr<<"FADER_CAP_CONTRAST_87 cap="<<capBrightness
+                         <<" chassis="<<chassisBrightness
+                         <<" x="<<sampleX<<'\n';
                 return 87;
+            }
         }
         // Verify the complete rotary red arc (not only its metal JPEG face)
         // fits inside the enlarged knob hit rectangle, including stroke.

@@ -266,10 +266,17 @@ void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
     // Tactile graphite cap: dark metal undercut + actual brushed-metal PNG.
     // This is not the old painted-on bright silver ridge. Keep the silhouette
     // readable at the real 14x30px GUI size, even on a dark empty rail.
-    g.setColour(juce::Colour{0xff4a545a});
+    // Graphite gradient is the material undercoat, not a silver overpaint.
+    // It keeps the small hardware cap distinguishable from its dark housing
+    // even after image filtering, while the PNG supplies brush and grip.
+    juce::ColourGradient brushed(juce::Colour{0xff768187},thumb.getX(),cy,
+                                 juce::Colour{0xff626c72},thumb.getRight(),cy,false);
+    brushed.addColour(0.16,juce::Colour{0xff737e84});
+    brushed.addColour(0.32,juce::Colour{0xff343b40});
+    brushed.addColour(0.52,juce::Colour{0xff1c2226});
+    brushed.addColour(0.76,juce::Colour{0xff3a4248});
+    g.setGradientFill(brushed);
     g.fillRoundedRectangle(thumb,3.0f);
-    g.setColour(juce::Colour{0xff161c20});
-    g.fillRoundedRectangle(thumb.reduced(1.15f,0.8f),2.3f);
     if(sliderThumbCompact.isValid() &&
        std::abs(thumb.getWidth()-sliderThumbCompact.getWidth())<0.65f &&
        std::abs(thumb.getHeight()-sliderThumbCompact.getHeight())<0.65f) {
