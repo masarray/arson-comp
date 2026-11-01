@@ -227,7 +227,7 @@ static int runSmoke(int argc,char** argv) {
         const float tone=surface.getPixelAt(90,42).getBrightness();
         if(rows<0.8f || across>2.5f || tone<0.24f || tone>0.41f) {
             std::cerr<<"BRUSHED_MATERIAL_89 grain="<<rows
-                     <<" horizontal="<<across<<" tone="<<tone<<'\\n';
+                     <<" horizontal="<<across<<" tone="<<tone<<std::endl;
             return 89;
         }
     }
