@@ -14,7 +14,8 @@ struct FaderGeometry {
         const float trackWidth=juce::jmax(1.0f,
             std::min(width-4.0f,(height-3.0f)*trackAspect));
         const float trackHeight=trackWidth/trackAspect;
-        const float thumbSize=juce::jlimit(22.0f,33.0f,height-4.0f);
+        // Smaller VISUAL thumb while keeping the 34px interactive Slider bounds.
+        const float thumbSize=juce::jlimit(20.0f,25.0f,height*0.70f);
         const float railX=(width-trackWidth)*0.5f;
         const float cy=height*0.5f;
         FaderGeometry g;

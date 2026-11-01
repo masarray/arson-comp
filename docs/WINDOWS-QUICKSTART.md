@@ -1,88 +1,82 @@
-# ArSonComp Windows x64 — start here
+# ArSonComp M7 — Windows x64 physical test quickstart
 
-**Test build / PR #1 — not a production release.** This artifact is generated from the exact commit recorded in `BUILD-INFO.txt` and is validated by Linux engine tests + Windows build, state/editor smoke and benchmark CI. It has **zero added DSP sample latency**; host buffer, audio interface and driver latency still exist.
+This is an engineering **test build**, not a public production release.
+The exact commit is in `BUILD-INFO.txt`; `SHA256SUMS.txt` lists binary hashes.
+The compressor adds zero **algorithmic sample** latency, not zero hardware
+round-trip/host/driver latency. Do not assume Maono PS22 stability from CI.
 
-## A. Fastest test: standalone
+## Install
 
-Run `Standalone/ArSonComp.exe`. Select the input/output device in the standalone Audio Settings. For monitoring your microphone, enable your input channels and use a low, stable buffer size appropriate to your device. This build does **not** claim ASIO support; host audio-device options vary.
+Standalone: launch `Standalone/ArSonComp.exe`. In Audio Settings choose
+the real interface and its **native ASIO driver** if available. If no ASIO
+driver appears, verify the vendor installer/driver first; WASAPI can be used
+for comparison. Start with a headphone-safe volume.
 
-## B. VST3 test in ArSonMiX or another DAW
+VST3: copy the **entire** `Plugin/ArSonComp.vst3` bundle to
+`C:\Program Files\Common Files\VST3\`, then rescan plugins.
+Test in ArSonMiX and one independent DAW that supports VST3.
 
-1. Copy the **entire** folder `Plugin/ArSonComp.vst3` to `C:\Program Files\Common Files\VST3\` (administrator permission may be needed).
-2. Restart or rescan VST3 in a compatible host.
-3. Insert ArSonComp on a track or bus. Start with ratio 2:1–4:1 and lower Threshold until you see approximately 3–6 dB gain reduction.
-4. Compare Clean, Feedback and Smooth at matched output loudness. Try MINI/FULL, drag the white threshold marker, and use SAVE/OPEN for your own `.arsoncomp` preset.
-5. Verify external sidechain routing only if your host exposes and connects the sidechain bus. Switch Listen SC off before normal use.
+## GUI and operation
 
-## C. Quick test checklist
+Full size is **612×580**, minimum **580×540**, MINI height **320**.
+Confirm the tall black-glass dynamics display, transfer curve, IN/GR/OUT
+meters, seven rotary knobs, search/preset browser, FILE/Save/Open, A/B and
+Bypass. The bottom tabs switch **Dynamics / Sidechain** without changing audio.
 
-- Vocal: listen for pumping, sibilance, level consistency and dry/wet behavior.
-- Bass: use low frequencies and aggressive attack to check distortion and filter interactions.
-- Transients: check drums with attack/hold/release; zero lookahead is not a true-peak limiter.
-- UI: switch MINI/FULL; resize to 660x490 and 704x520, then try a larger window. Confirm bottom LCD value readout, labels, metering, and HP/LP controls.
-- Project: save, close, reload; confirm host parameters, style, bypass and input/output routing.
-- For performance, use multiple instances in your host and compare CPU with plugin editors hidden/visible.
+The six horizontal controls (Range, Hold, Mix, Link, HP, LP) retain the
+user-approved flat silver brushed-metal track and round silver thumb.
+M7 makes the visible thumb smaller without reducing its mouse drag area;
+caption and fader are slightly lower. The body is matte brushed graphite,
+with **flat horizontal grain** rather than wave-like sheen.
 
-## Included evidence
+Hover/drag any control to see its exact value in the LCD bottom readout.
+Double-click any slider/knob to restore the specified factory default.
+Test MINI/FULL, minimum/default width, Sidechain and preset browser for
+readability and control collision.
 
-`Screenshots/` has Windows editor smoke captures. `benchmark.txt` is a machine-dependent 48-kHz/64-frame microbenchmark and **not** a DAW dropout guarantee. `SHA256SUMS.txt` contains hashes of the executable plugin payloads.
+## Safe physical listening procedure
 
-FabFilter Pro-C is an independent benchmark for workflow/quality only. No FabFilter code, UI asset or proprietary algorithm is included.
+1. Start at **48 kHz, 128 samples**, one plugin instance. Keep LISTEN SC
+   disabled unless you are intentionally auditioning the detector.
+2. Select Clean mode, approximately **2:1–4:1**, set Threshold for
+   **3–6 dB gain reduction** on a steady voice. Adjust Makeup conservatively
+   to avoid downstream clipping. Compare Active/Bypass at similar loudness.
+3. Repeat with vocals, bass, snare/drum transients, speech and a stereo mix.
+   Compare Clean / Feedback / Smooth at matched loudness, checking attack,
+   recovery, pumping, sibilance, stereo coherence and unwanted distortion.
+4. Only after stable 128-sample operation, test **64 then 32** sample buffers.
+   Log audio glitches and the **actual host xrun count/callback spikes**,
+   not only Task Manager CPU. Repeat with 1 then 8 active instances.
 
-### New full-graph GUI acceptance
+## Isolate crackles: same sample rate, driver, gain and routing
 
-Check upper central transfer graph, red fading curve and live gain reduction line, left input stereo LED meters, right GR and output stereo LEDs, and enlarged Threshold knob. Check the default/minimum/MINI screenshots from this commit, not a previous ZIP. No lookahead is present in the zero-added-sample live signal path.
+A: Audio interface direct monitoring, no application processing.
+B: Host routing with no ArSonComp inserted.
+C: Plugin inserted and **host-bypassed** (immediate bit-transparent bypass).
+D: Plugin active with fixed parameters.
 
-### Compact responsive GUI and bottom-of-LCD value display
+If A/B/C crackles, investigate driver, host routing, DPC, USB and interface
+before blaming compressor DSP. If only D crackles, record the digital input
+and processed output, current parameters, buffer, host xrun log and automation.
+The plugin's own Active/Bypass control is smoothed, unlike immediate host bypass.
 
-The editor now defaults to **704×520**, with **660×490** minimum full size and **330px** high MINI. FULL restores the preceding expanded dimensions. The primary rotary row is shorter, Sidechain positions adapt to the editor width, and the actual meter/graph canvas retains useful space.
+## Reliability and report
 
-Hover or drag **any** rotary knob or horizontal slider to show its name, exact value and unit in the **bottom centre of the black LCD**. The last focused value remains visible rather than flashing away. MINI uses the right-hand footer for the readout. There are **no overlay value bubbles or TooltipWindow**, so nothing obscures the controls. Double-click a knob or slider to restore its factory value. The JUCE APVTS host-automation attachments and audio DSP remain unchanged.
+Save/reopen a real DAW project and verify state, factory/user preset, A/B,
+all automation, MINI/FULL and external mono/stereo sidechain routing.
+Disable SC LISTEN again after checking. Run a **60-minute live audio test**,
+open/close the editor, observe private-memory growth, actual xrun counters
+and any UI stalls. No physical result is declared until recorded.
 
-### Two-sided dissolve, low-cost LED metering
+Optional: right-click `QA/Collect-ArSonComp-Hardware.ps1` and run with
+PowerShell (or run directly from a PowerShell terminal). It writes a
+**read-only device inventory and a manual checklist** into `QA/Reports/`.
+It does NOT measure xruns, audio timing or hardware latency.
 
-Use the Standalone EXE or VST3 from the **latest** matching Windows Actions artifact. With audio playing, confirm the red gain-reduction trace and gray input/output traces disappear gradually at **both ends** of the dynamics graph without abrupt vertical cutoffs, while remaining crisp in the middle. The curve marker and compressor settings must still work as before. Confirm meters decay smoothly and their unlit segments are visible at all levels. Graph rendering is GUI-only, with no lookahead or additional algorithmic audio samples. Measure CPU and crackles in your own host/driver at 32/64/128 sample buffers rather than treating CI synthetic numbers as real-device measurements.
+The included `Screenshots/` are actual JUCE CI renders;
+`benchmark.txt` and `realtime-stress.txt` are machine-dependent synthetic
+engine timings, not real DAW latency or glitch measurements.
 
-### Metal controls and decluttered header
-
-All primary knobs now mimic machined/brushed aluminium with a black recessed channel and a coral (not green) value sector. Hover any knob or slider to see its current value in the LCD footer; double-click to restore the default. Click **FILE** in the header to open Save/Open options for your .arsoncomp user presets; the previous separate SAVE/OPEN buttons are now intentionally removed. Switch the footer between **DYNAMICS** and **SIDECHAIN** for advanced detector filters and monitoring. Switching pages does not change or reset audio parameters. Compare all four screenshots (default, minimum, MINI, SIDECHAIN), then validate physically in Standalone or your VST3 host.
-
-### Live-host readiness checks (new)
-
-Run the supplied Standalone on your audio interface and load the complete VST3 in a DAW or ArSonMiX. Start with 48 kHz and a 128-sample host buffer; repeat at 64 then 32 samples where stable. Route a mono kick/mic into the VST3 external Sidechain bus on a stereo track: when **EXT SC** is selected, a strong detector signal must attenuate the main stereo channels while preserving their balance; switching it off must restore internal detection. Try host Bypass at +12 dB Input and Makeup, preset save/reopen, MINI/full, then stop transport and confirm the last dynamics trace clears rather than freezing. Real driver round-trip latency is separate from the plugin's zero additional algorithmic samples.
-
-### Hardware knob and gunmetal slider controls
-
-All rotary knobs retain their coral sector behind the black brushed-metal face and a small coral pointer dot near the rim. The numerical text boxes are removed. Horizontal Range/Hold/Mix/Link/HP/LP faders render a **stationary gunmetal rail**, coral-red recessed level and a **moving gunmetal thumb in front**. They use the same JUCE parameter controls as before, without changing audio behavior. AUTO/EXT SC/LISTEN and ACTIVE/BYPASS use compact left-caption toggles.
-
-### Premium brushed-metal and glass UI
-
-The updated full editor should now have a horizontally brushed grey metal background and a recessed jet-black LCD for the dynamics history/transfer graph and segmented IN/GR/OUT meters. The knob area is shorter, leaving more room for the screen. Range/Hold/Mix/Link/HP/LP rails have a deep shadowed well sized to the original metallic thumb; all toggle captions appear on the left of their switches, including ACTIVE/BYPASS in the header. Both DYNAMICS and SIDECHAIN pages, MINI, old presets/automation and all audio routes continue working. No plugin audio processing or added algorithmic sample delay has changed.
-
-### M4 compact, readable chassis
-
-The editor now defaults to **704×520**, with **660×490** as the minimum FULL layout and an unchanged 330px-high MINI view. Compared with the old 780×640 default, the window consumes approximately 27% less screen area without indiscriminately shrinking knobs. All header separators and unnecessary overline captions are removed; the only header captions are MODEL and PRESET. Brushed panel label contrast is checked by automated WCAG-style tests (>=4.5:1 against dark metal reference). The preset remains width-bounded. The footer technical slogan has been removed to prioritize the live value readout. Test at both minimum/default size and with the SIDECHAIN tab selected.
-
-## Windows interface crackle diagnostic — native ASIO (PS22 and similar)
-
-The standard JUCE `juce_audio_devices` build defaults `JUCE_ASIO=0`. ArSonComp Windows builds now enable `ARSON_WINDOWS_ASIO=ON` (and `JUCE_ASIO=1`) so **Standalone Options → Audio Settings** can list the system's native ASIO devices. This only enables the backend; install your interface manufacturer's official driver separately. **VST3 uses the audio driver selected by its DAW/host**, not the plug-in.
-
-For MAONO PS22, install the official [PS22 Windows driver and routing tool](https://faq.maono.com/docs/PS22-FAQs); in the application choose **ASIO** and the device named **Maono ASIO** (name may vary by driver version). Set input and output to PS22, start with **48 kHz, 512 samples**, then test 256 / 128 / 64 only if stable. Close other apps using the ASIO interface, use a direct motherboard USB connection, and disable PS22 direct monitoring if monitoring its software-processed audio to avoid doubled sound. MAONO specifically documents the Maono ASIO driver for its interfaces at https://faq.maono.com/docs/TrueRTA-REW-Software-Configuration-Guide .
-
-**Isolate the fault before claiming a fix:** (A) PS22 direct monitor (analog baseline, no ArSonComp), (B) unprocessed Windows/DAW input/output, (C) VST3 or Standalone with compressor host-bypassed, (D) compressor active with identical gain and routing. If A has crackles suspect input/cable/hardware; if B/C also crackle suspect driver, buffer, USB or operating-system scheduling; if only D crackles investigate DSP/automation and capture a digital audio recording. A single Task Manager CPU/GPU/memory snapshot is not an xrun measurement. Report driver name, sample rate, buffer, whether Standalone or VST3, and whether bypass removes crackles. A real audio-device test is required.
-
-`ARSON_WINDOWS_ASIO=OFF` can be used by downstream builders who cannot accept the Steinberg ASIO SDK's third-party licensing terms; review distribution compliance before a public release. Enabling ASIO does **not** ensure zero hardware latency or prevent all crackles.
-
-### M5 original factory presets and browser
-
-The preset dropdown includes **46 original ArSonComp factory starting points** in ten categories: Clean, Vocals, Drums, Bass, Guitar, Piano, Mixbus, Mastering, Special, and Live & Broadcast. Choose **SEARCH / BROWSE PRESETS...** at the top or FILE → Browse factory bank to open the compact in-plugin browser without resizing the editor.
-
-Search matches name, category, tags and description. Pick a row to see its purpose and author. APPLY auditions without closing; double-click applies and closes; keyboard arrows and Enter apply, Escape closes. STAR/UNSTAR stores stable favorite IDs in the user application data directory, and FAVORITES filters the list. Use the bank's preset list directly for faster navigation.
-
-Presets are designed for ArSonComp's independent three compressor models, **not** imported FabFilter .ffp programs or claims of matching proprietary factory sounds. Each preset preserves the current External SC, Listen and Bypass switches, so recall never silently changes live routing. Threshold and amount of reduction always depend on the input's actual level; tune to source and loudness-match listening comparisons. FILE Save/Open continues to support the existing .arsoncomp user preset format.
-
-## Smaller factory-browser GUI (2026-10-31)
-
-New default FULL window **612×500**, minimum **580×480**; MINI height **320**, retaining the live meter well. Header is a single compact responsive row (100px brand, smaller model/actions, usable preset field). Main rotary controls retain a 62px drag target, and SIDECHAIN HP/LP/detector/EXT/LISTEN widths are calculated from available space to avoid clipping at minimum width. The categorized 46-preset browser remains a transient overlay, not a permanent wide side panel.
-
-Factory programs now include purpose-specific Makeup starting gain, generally stronger for vocals/live and gentler for mastering. The goal is a noticeable first impression **without silently bypassing dynamics**, not guaranteed louder-is-better or universal headroom safety. Watch the output meter, adjust Input/Makeup and compare Bypass at matched loudness.
+ASIO SDK distribution licensing must be reviewed before any public
+installer. The 46 factory presets, audio DSP, parameter IDs and latency are
+unchanged by M7.
