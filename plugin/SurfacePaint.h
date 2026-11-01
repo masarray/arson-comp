@@ -17,7 +17,7 @@ inline void paintBrushedChassis(juce::Graphics& g,int width,int height) {
         std::uint32_t k=static_cast<std::uint32_t>(y)+0x9e3779b9u;
         k^=k>>16; k*=0x7feb352du;
         k^=k>>15; k*=0x846ca68bu; k^=k>>16;
-        const float a=0.045f+static_cast<float>((k>>25)&31u)*0.0015f;
+        const float a=0.025f+static_cast<float>((k>>25)&31u)*0.00065f;
         g.setColour((k&1u) ? juce::Colours::white.withAlpha(a) :
                               juce::Colours::black.withAlpha(a*1.10f));
         g.drawHorizontalLine(y,0.0f,static_cast<float>(width));
@@ -28,8 +28,8 @@ inline void paintBrushedChassis(juce::Graphics& g,int width,int height) {
                 const int x=cell*64+static_cast<int>((t>>22)&15u);
                 const int right=std::min(width,x+15+static_cast<int>((t>>16)&31u));
                 if(right<=x)continue;
-                g.setColour((t&1u) ? juce::Colours::white.withAlpha(0.040f) :
-                                    juce::Colours::black.withAlpha(0.050f));
+                g.setColour((t&1u) ? juce::Colours::white.withAlpha(0.028f) :
+                                    juce::Colours::black.withAlpha(0.035f));
                 g.drawHorizontalLine(y,static_cast<float>(x),static_cast<float>(right));
             }
         }
