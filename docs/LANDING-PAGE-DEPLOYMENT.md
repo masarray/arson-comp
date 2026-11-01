@@ -2,7 +2,7 @@
 
 This is the production-ready, framework-free marketing/download site under site/.
 There is no npm install, bundler, Google Fonts request, analytics SDK or web API.
-It uses **real original M7 JUCE screenshots**, copied by their Git blob SHA from docs/images/ to site/assets/. The source release is **v0.2.0-rc.1** and must not be called stable before actual host/hardware gates.
+It uses **real original M7 JUCE screenshots**, copied by their Git blob SHA from docs/images/ to site/assets/. The download baseline is **v0.2.0 Stable**, promoted from the owner-tested RC with the same verified binary checksums.
 
 ## GitHub Pages — automatic deployment
 1. Repository: Settings → Pages → Build and deployment → **Source: GitHub Actions**.
@@ -26,7 +26,7 @@ Do not add a guessed CNAME or domain. Cloudflare Pages project/domain connection
 ## Content maintenance
 - Official release assets and names are pinned in site/index.html. The OS-aware main CTA in site/app.js uses the same Windows/macOS release files. **When a new public release is published, update the links in both files**, then run site/scripts/validate_site.py. This prevents silent downloads pointing to a nonexistent "latest" installer.
 - Keep the Linux DEB and portable paths distinct; autodetection must not force Ubuntu DEB onto arbitrary Linux.
-- v0.2.0-rc.1 macOS PKG is ad-hoc signed and not notarized. Do not remove this caveat.
+- v0.2.0 Stable macOS PKG is ad-hoc signed and not notarized. Do not remove this caveat.
 - Keep all 5 actual product snapshots in site/assets, not AI renderings.
 - No claims of zero *hardware* latency, zero xruns or parity with other commercial compressors.
 

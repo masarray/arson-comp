@@ -1,6 +1,11 @@
 # Release qualification checklist — ArSonComp
 
-The public version **v0.2.0-rc.1 is a Release Candidate**. Do not promote to stable until the following gates are evidenced. The checklist is intentionally short, quantitative and reproducible.
+**v0.2.0 Stable has been published following explicit owner confirmation of physical testing.** The previously tested RC installers were promoted byte-for-byte with SHA-256 verification. This is a living compatibility/certification checklist: unchecked items remain genuinely unverified, not claims that Stable publication failed.
+
+## Owner release decision
+- [x] Owner explicitly reports product physically tested and approves the v0.2.0 Stable label (2026-11-01)
+- [x] Stable release published from the tested RC installer bytes with matching SHA-256 checksums
+- [ ] Independent hardware test report specifying host, driver, buffer, measured xruns, and test duration archived
 
 ## Build, package and artifact integrity
 - [x] Windows x64 VST3 + Standalone builds and CTest
@@ -31,4 +36,4 @@ The public version **v0.2.0-rc.1 is a Release Candidate**. Do not promote to sta
 - [ ] macOS Developer ID signing and Apple notarization for frictionless Gatekeeper experience
 - [ ] Domain ownership / Cloudflare Pages primary-site configuration if replacing GitHub Pages
 
-Only after all **blocking** criteria are reviewed by a maintainer should a new stable tag be created; never silently overwrite v0.2.0-rc.1 release assets. See [Windows physical test](WINDOWS-QUICKSTART.md) and [release status](RELEASE-STATUS.md).
+Public Stable v0.2.0 is already released by owner decision. Complete the remaining unchecked evidence for broader interoperability and independent QA; never overwrite previously published binaries. See [Windows physical test](WINDOWS-QUICKSTART.md), [public release](https://github.com/masarray/arson-comp/releases/tag/v0.2.0), and [release status](RELEASE-STATUS.md).
