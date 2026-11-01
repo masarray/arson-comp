@@ -25,3 +25,8 @@
 - Catalog browser supports real categories/search/tags/description/favorites without consuming additional permanent GUI space.
 - Loading a factory program never changes External SC, Listen or Bypass; factory values are sanitized against the canonical parameter table.
 - UI favorites persistence is strictly on the message thread, never in DSP. Test every program for finite output, safe bounds and host parameter recall, plus browser screenshot.
+
+## M7 physical readiness
+- Keep the user-approved separate transparent horizontal silver ruler and round thumb; avoid fake light waves or diagonal specular backgrounds. Cache matte brushed grain only on resize.
+- Retain visual/native slider hit separation, caption clearances, host automation and LCD meter isolation.
+- A shipped Windows test artifact needs the actual screenshot set, QA inventory helper and an explicit physical-test checklist; no CI result proves PS22 xruns or commercial sonic parity.
