@@ -66,7 +66,7 @@ Start physical audio testing at **48 kHz / 128 samples** and move to 64/32 only 
 
 **v0.2.0-rc.1 is a public Release Candidate — not a certified production-stable audio release.** The [cross-platform CI run](https://github.com/masarray/arson-comp/actions/runs/41273600039) passed Windows, Linux and macOS builds/tests/packaging. CI does not prove glitch-free audio on physical interfaces or all DAWs, independent pluginval certification, commercially matched sound quality, or notarized macOS installation.
 
-[Current release status](docs/RELEASE-STATUS.md) · [Validation record](docs/VALIDATION.md) · [Architecture](docs/ARD.md) · [Report a problem](https://github.com/masarray/arson-comp/issues/new/choose) · [Contributing](CONTRIBUTING.md)
+[Current release status](docs/RELEASE-STATUS.md) · [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md) · [Release readiness checklist](docs/RELEASE-CHECKLIST.md) · [Validation record](docs/VALIDATION.md) · [Architecture](docs/ARD.md) · [Report a problem](https://github.com/masarray/arson-comp/issues/new/choose) · [Contributing](CONTRIBUTING.md)
 
 ## Build and licensing
 
