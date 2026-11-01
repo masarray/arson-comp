@@ -209,6 +209,28 @@ static int runSmoke(int argc,char** argv) {
         if(std::abs(audio.getSample(0,0)-0.123f)>1.0e-6f ||
            std::abs(audio.getSample(0,31)-0.123f)>1.0e-6f)return failHost(46);
     }
+    // M7: the real cached chassis must have a visible fine horizontal
+    // brush grain WITHOUT large-scale left-to-right spotlight gradients.
+    {
+        constexpr int w=192,h=96;
+        juce::Image surface(juce::Image::RGB,w,h,true);
+        {
+            juce::Graphics paint(surface);
+            arson::ui::paintBrushedChassis(paint,w,h);
+        }
+        float rows=0.0f,across=0.0f;
+        for(int y=8;y<88;++y) {
+            const float v=surface.getPixelAt(90,y).getBrightness();
+            rows+=std::abs(v-surface.getPixelAt(90,y+1).getBrightness());
+            across+=std::abs(v-surface.getPixelAt(16,y).getBrightness());
+        }
+        const float tone=surface.getPixelAt(90,42).getBrightness();
+        if(rows<0.8f || across>2.5f || tone<0.24f || tone>0.41f) {
+            std::cerr<<"BRUSHED_MATERIAL_89 grain="<<rows
+                     <<" horizontal="<<across<<" tone="<<tone<<'\\n';
+            return 89;
+        }
+    }
     // Approved M6.3 PNG resources are embedded and independently decoded.
     // Never replace the textured ruler or circular thumb with drawn shapes.
     {
@@ -239,7 +261,9 @@ static int runSmoke(int argc,char** argv) {
                        shape.track.getX()<0.0f || shape.track.getRight()>width ||
                        shape.thumb.getX()<0.0f || shape.thumb.getRight()>width ||
                        shape.thumb.getY()<0.0f || shape.thumb.getBottom()>height ||
-                       shape.left>=shape.right) {
+                       shape.left>=shape.right ||
+                       shape.thumb.getWidth()<20.0f ||
+                       shape.thumb.getWidth()>25.01f) {
                         std::cerr<<"PHOTO_GEOMETRY_73 w="<<width<<"\n";
                         return 73;
                     }
@@ -645,7 +669,10 @@ static int runSmoke(int argc,char** argv) {
             const auto* fader=editor->findChildWithID("param."+juce::String(name));
             if(!caption||!fader||fader->getY()-caption->getBottom()<4||
                fader->getHeight()!=arson::ui::EditorMetrics::faderHeight||
-               fader->getBottom()>editor->getHeight()-5)return 76;
+               fader->getBottom()>editor->getHeight()-5 ||
+                caption->getY() !=
+                    editor->getHeight()-arson::ui::EditorMetrics::bottomControlsReserve+
+                    arson::ui::EditorMetrics::faderCaptionOffset)return 76;
         }
         // File controls are deliberately not mounted in the visible header.
         // Both independent tab views must have unclipped, non-overlapping
@@ -692,7 +719,10 @@ static int runSmoke(int argc,char** argv) {
                 const auto* caption=editor->findChildWithID("caption."+juce::String(name));
                 const auto* fader=editor->findChildWithID("param."+juce::String(name));
                 if(!caption||!fader||fader->getY()-caption->getBottom()<4||
-                   fader->getHeight()!=arson::ui::EditorMetrics::faderHeight)return 77;
+                   fader->getHeight()!=arson::ui::EditorMetrics::faderHeight ||
+                    caption->getY() !=
+                        editor->getHeight()-arson::ui::EditorMetrics::bottomControlsReserve+
+                        arson::ui::EditorMetrics::faderCaptionOffset)return 77;
             }
             if(!hp->isVisible()||!lp->isVisible()||!detector->isVisible()||
                !external->isVisible()||!listen->isVisible()||
