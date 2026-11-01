@@ -1,0 +1,162 @@
+name: Build public installers
+on:
+  pull_request:
+    paths: ['CMakeLists.txt', 'packaging/**', 'docs/INSTALL-PUBLIC.md', '.github/workflows/release-installers.yml']
+  push:
+    branches: [main]
+    paths: ['CMakeLists.txt', 'packaging/**', 'docs/INSTALL-PUBLIC.md', '.github/workflows/release-installers.yml']
+  workflow_dispatch:
+    inputs:
+      publish:
+        type: boolean
+        description: Publish checked installers to GitHub Releases
+        default: false
+      stable:
+        type: boolean
+        description: Stable requires ARSON_STABLE_APPROVED=yes repository variable
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: arsoncomp-packages-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  RELEASE_VERSION: 0.2.0
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: build/_deps/juce-src
+          key: arson-juce-8.0.12-windows
+      - name: Build and run all Windows tests
+        shell: pwsh
+        run: |
+          cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --parallel 4
+          ctest --test-dir build -C Release --output-on-failure
+      - name: Compile Inno installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $pwd 'dist\stage'
+          $out = Join-Path $pwd 'dist\out'
+          New-Item -ItemType Directory -Force "$stage\VST3", "$stage\Standalone", $out | Out-Null
+          Copy-Item -Recurse 'build\ArSonComp_artefacts\Release\VST3\ArSonComp.vst3' "$stage\VST3\"
+          Copy-Item 'build\ArSonComp_artefacts\Release\Standalone\ArSonComp.exe' "$stage\Standalone\"
+          Copy-Item docs\INSTALL-PUBLIC.md "$stage\START-HERE.md"
+          Copy-Item LICENSE "$stage\LICENSE"
+          $iscc = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup 6 was not found' }
+          & $iscc "/DStageDir=$stage" "/DAppVersion=$env:RELEASE_VERSION" "/O$out" "packaging\windows\ArSonComp.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC exit $LASTEXITCODE" }
+          if (@(Get-ChildItem "$out\*.exe").Count -ne 1) { throw 'Missing installer EXE' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArSonComp-Windows-Installer
+          path: dist/out/*.exe
+          if-no-files-found: error
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install JUCE prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev libjack-jackd2-dev ladspa-sdk libfreetype-dev \
+            libfontconfig1-dev libx11-dev libxcomposite-dev libxcursor-dev \
+            libxext-dev libxinerama-dev libxrandr-dev libxrender-dev \
+            libxi-dev libglu1-mesa-dev libgtk-3-dev xvfb
+      - uses: actions/cache@v4
+        with:
+          path: build/_deps/juce-src
+          key: arson-juce-8.0.12-ubuntu24
+      - name: Build, smoke-test and package Linux
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+          xvfb-run -a ctest --test-dir build --output-on-failure
+          bash packaging/linux/package.sh build dist/out "$RELEASE_VERSION"
+          dpkg-deb --info "dist/out/ArSonComp-$RELEASE_VERSION-Ubuntu-Debian-amd64.deb"
+          tar -tzf "dist/out/ArSonComp-$RELEASE_VERSION-Linux-x86_64-Portable.tar.gz" | grep -F install.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArSonComp-Linux-Installers
+          path: dist/out/*
+          if-no-files-found: error
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: build/_deps/juce-src
+          key: arson-juce-8.0.12-macos
+      - name: Universal build, test and ad-hoc package
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64'
+          cmake --build build --parallel 3
+          ctest --test-dir build --output-on-failure
+          bash packaging/macos/package.sh build dist/out "$RELEASE_VERSION"
+          test -s "dist/out/ArSonComp-$RELEASE_VERSION-macOS-Universal-AdHoc.pkg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArSonComp-macOS-Installers
+          path: dist/out/*
+          if-no-files-found: error
+  publish:
+    needs: [windows, linux, macos]
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ArSonComp-*-Installer*
+          path: dist
+          merge-multiple: true
+      - name: Publish only after all OS gates pass
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          STABLE_APPROVAL: ${{ vars.ARSON_STABLE_APPROVED }}
+          STABLE_REQUEST: ${{ inputs.stable }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(dist/*.exe dist/*.deb dist/*.tar.gz dist/*.pkg dist/*.zip)
+          if (( ${#files[@]} < 5 )); then
+            echo "Missing one or more platform installers"; exit 7
+          fi
+          ( cd dist && sha256sum ./* > SHA256SUMS.txt )
+          tag="v${RELEASE_VERSION}-rc.1"
+          flag="--prerelease"
+          if [[ "$STABLE_REQUEST" == "true" ]]; then
+            if [[ "$STABLE_APPROVAL" != "yes" ]]; then
+              echo "Stable requires repository variable ARSON_STABLE_APPROVED=yes"; exit 8
+            fi
+            tag="v${RELEASE_VERSION}"
+            flag=""
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists: $tag. Refusing to overwrite artifacts."; exit 9
+          fi
+          cat > notes.md <<EOF
+          ArSonComp $tag — Windows Inno Setup, Linux DEB + portable and macOS universal ad-hoc PKG/VST3.
+          Installation: https://github.com/masarray/arson-comp/blob/$GITHUB_SHA/docs/INSTALL-PUBLIC.md
+          Source (AGPL): https://github.com/masarray/arson-comp/tree/$GITHUB_SHA
+          macOS PKG is NOT Apple notarized; Gatekeeper may warn.
+          CI is not hardware/DAW/ASIO stability certification. Check the included SHA256SUMS.txt.
+          EOF
+          gh release create "$tag" dist/* \
+            --target "$GITHUB_SHA" --title "ArSonComp $tag" $flag --notes-file notes.md

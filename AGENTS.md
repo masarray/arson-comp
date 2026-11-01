@@ -30,3 +30,10 @@
 - Keep the user-approved separate transparent horizontal silver ruler and round thumb; avoid fake light waves or diagonal specular backgrounds. Cache matte brushed grain only on resize.
 - Retain visual/native slider hit separation, caption clearances, host automation and LCD meter isolation.
 - A shipped Windows test artifact needs the actual screenshot set, QA inventory helper and an explicit physical-test checklist; no CI result proves PS22 xruns or commercial sonic parity.
+
+## Public installer release gate (v0.2)
+- Rebuild VST3/Standalone and run actual plugin smoke on all three supported OS runners. Publish only if Windows Inno, Linux DEB+portable and macOS universal ad-hoc packages all pass.
+- Inno defaults to user install and supports optional all-users UAC; install to Steinberg-standard VST3 locations, with uninstall and duplicate-scope detection.
+- Linux package must provide a user-mode no-sudo option. macOS ad-hoc is **not** Apple Developer ID signing or notarization. Do not instruct users to disable Gatekeeper globally.
+- Do not describe a CI-only artifact as hardware-certified stable. Promote the public RC to stable only after license and DAW/interface tests are documented and ARSON_STABLE_APPROVED is explicitly enabled by repository owner.
+- Do not remove bundled ASIO support without stating the user impact; check redistribution terms before public stable.
