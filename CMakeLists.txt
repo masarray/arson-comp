@@ -50,10 +50,12 @@ if(ARSON_BUILD_PLUGIN)
     PRODUCT_NAME "ArSonComp" IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE EDITOR_WANTS_KEYBOARD_FOCUS FALSE COPY_PLUGIN_AFTER_BUILD FALSE
     VST3_CATEGORIES Fx Dynamics)
-  # Keep only knob, toggle and logo assets: faders are pure JUCE vectors.
-  # No track/thumb PNG or runtime resampling.
+  # Knob/toggle artwork and the approved flat brushed-metal fader pair
+  # are compiled into the VST3/Standalone. No file-system reads at runtime.
   juce_add_binary_data(ArSonCompKnobAssets
     SOURCES assets/black_brushed_knob.jpg
+            assets/sliders/arsoncomp_flat_track_480.png
+            assets/sliders/arsoncomp_silver_thumb_96.png
             assets/toggle/arson_toggle_on.png
             assets/toggle/arson_toggle_off.png
             assets/arsoncomp_header_logo.png)

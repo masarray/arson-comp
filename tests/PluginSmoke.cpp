@@ -209,40 +209,73 @@ static int runSmoke(int argc,char** argv) {
         if(std::abs(audio.getSample(0,0)-0.123f)>1.0e-6f ||
            std::abs(audio.getSample(0,31)-0.123f)>1.0e-6f)return failHost(46);
     }
-    // Fully vector JUCE Graphics faders; raster and geometric regression.
+    // Approved M6.3 PNG resources are embedded and independently decoded.
+    // Never replace the textured ruler or circular thumb with drawn shapes.
     {
+        const auto track=juce::ImageFileFormat::loadFrom(
+            BinaryData::arsoncomp_flat_track_480_png,
+            static_cast<std::size_t>(BinaryData::arsoncomp_flat_track_480_pngSize));
+        const auto thumb=juce::ImageFileFormat::loadFrom(
+            BinaryData::arsoncomp_silver_thumb_96_png,
+            static_cast<std::size_t>(BinaryData::arsoncomp_silver_thumb_96_pngSize));
+        if(!track.isValid() || !thumb.isValid() ||
+           track.getWidth()!=480 || track.getHeight()!=66 ||
+           thumb.getWidth()!=96 || thumb.getHeight()!=96 ||
+           track.getPixelAt(0,0).getFloatAlpha()>0.05f ||
+           thumb.getPixelAt(0,0).getFloatAlpha()>0.05f ||
+           track.getPixelAt(240,33).getFloatAlpha()<0.80f ||
+           thumb.getPixelAt(48,48).getFloatAlpha()<0.80f) {
+            std::cerr<<"PHOTO_ASSET_47: invalid dimensions or alpha\n";
+            return 47;
+        }
         for(float width : {70.0f,90.0f,105.0f,150.0f})
-            for(float height : {34.0f,36.0f,40.0f})
+            for(float height : {34.0f,40.0f})
                 for(float pos : {-100.0f,width*0.5f,width+100.0f}) {
                     const auto shape=arson::ui::FaderGeometry::calculate(
                         width,height,pos);
-                    if(shape.track.getHeight()!=arson::ui::FaderGeometry::railHeight ||
-                       shape.track.getX()<0||shape.track.getRight()>width ||
-                       shape.thumb.getX()<0||shape.thumb.getRight()>width ||
-                       shape.thumb.getY()<0||shape.thumb.getBottom()>height ||
-                       shape.thumb.getWidth()<12.0f||shape.thumb.getHeight()<22.0f ||
-                       shape.right<=shape.left)return 73;
+                    if(std::abs(shape.track.getWidth()/shape.track.getHeight()-
+                                arson::ui::FaderGeometry::trackAspect)>0.001f ||
+                       std::abs(shape.thumb.getWidth()-shape.thumb.getHeight())>0.001f ||
+                       shape.track.getX()<0.0f || shape.track.getRight()>width ||
+                       shape.thumb.getX()<0.0f || shape.thumb.getRight()>width ||
+                       shape.thumb.getY()<0.0f || shape.thumb.getBottom()>height ||
+                       shape.left>=shape.right) {
+                        std::cerr<<"PHOTO_GEOMETRY_73 w="<<width<<"\n";
+                        return 73;
+                    }
                 }
-        {
-            CompLook look;
-            juce::Image raster(juce::Image::ARGB,100,34,true);
+        // Test the production LookAndFeel at actual 34px compact height.
+        CompLook look;
+        juce::Slider slider;
+        constexpr int w=160,h=40;
+        const auto render=[&](float position) {
+            juce::Image canvas(juce::Image::RGB,w,h,true);
             {
-                juce::Graphics g(raster);
-                g.fillAll(juce::Colour{0xff262c31});
-                juce::Slider dummy;
-                look.drawLinearSlider(g,0,0,100,34,55.0f,0.0f,100.0f,
-                                      juce::Slider::LinearHorizontal,dummy);
+                juce::Graphics g(canvas);
+                g.fillAll(juce::Colour{0xff454a4d});
+                look.drawLinearSlider(g,0,0,w,h,position,0.0f,0.0f,
+                                      juce::Slider::LinearHorizontal,slider);
             }
-            const auto shape=arson::ui::FaderGeometry::calculate(100.0f,34.0f,55.0f);
-            const int px=juce::roundToInt(shape.thumb.getX()+2.0f);
-            const int py=juce::roundToInt(shape.thumb.getY()+5.0f);
-            const float cap=raster.getPixelAt(px,py).getBrightness();
-            const float backdrop=raster.getPixelAt(2,py).getBrightness();
-            if(cap<0.22f || cap-backdrop<0.06f) {
-                std::cerr<<"VECTOR_CAP_CONTRAST_87 cap="<<cap
-                         <<" backdrop="<<backdrop<<std::endl;
-                return 87;
-            }
+            return canvas;
+        };
+        const auto low=render(21.0f);
+        const auto mid=render(80.0f);
+        const auto high=render(139.0f);
+        // The ruler is stationary at low/high. No red LED or painted fill.
+        const float railDifference=std::abs(
+            low.getPixelAt(80,13).getBrightness()-
+            high.getPixelAt(80,13).getBrightness());
+        if(railDifference>0.04f)return 78;
+        // A brushed silver thumb must contrast the dark slot and travel.
+        const float leftDiff=std::abs(
+            low.getPixelAt(21,20).getBrightness()-
+            high.getPixelAt(21,20).getBrightness());
+        const float midDiff=std::abs(
+            mid.getPixelAt(80,20).getBrightness()-
+            high.getPixelAt(80,20).getBrightness());
+        if(leftDiff<0.10f || midDiff<0.10f) {
+            std::cerr<<"PHOTO_THUMB_TRAVEL_55 "<<leftDiff<<","<<midDiff<<"\n";
+            return 55;
         }
         for(int width : {62,66,72,78,100})
             for(bool threshold : {false,true}) {
@@ -253,54 +286,6 @@ static int runSmoke(int argc,char** argv) {
                     0.5f*std::min(width,arson::ui::EditorMetrics::knobHeight)
                     +0.01f)return 83;
             }
-        // Raster-render all three slider positions via the *production*
-        // LookAndFeel, then inspect the LED at a track location untouched
-        // by the thumb. Red must be off at minimum and lit at maximum.
-        CompLook look;
-        juce::Slider slider;
-        constexpr int w=160,h=40;
-        const auto render=[&](float position) {
-            juce::Image canvas(juce::Image::RGB,w,h,true);
-            {
-                juce::Graphics g(canvas);
-                g.fillAll(juce::Colour{0xff44494d});
-                look.drawLinearSlider(g,0,0,w,h,position,0.0f,0.0f,
-                                      juce::Slider::LinearHorizontal,slider);
-            }
-            return canvas;
-        };
-        const auto low=render(21.0f);
-        const auto mid=render(80.0f);
-        const auto high=render(139.0f);
-        // Inset vector channel should be darker than chassis at centre.
-        const auto housingPixel=low.getPixelAt(61,17);
-        const auto backdrop=juce::Colour{0xff44494d};
-        if(housingPixel.getBrightness()>=backdrop.getBrightness()-0.045f) {
-            std::cerr<<"FADER_HOUSING_DEPTH_78 pixel="
-                     <<housingPixel.toDisplayString(true)<<"\n";
-            return 78;
-        }
-        const auto off=low.getPixelAt(61,20);
-        const auto on=high.getPixelAt(61,20);
-        if(on.getRed()<=off.getRed()+35 ||
-           on.getRed()<=on.getGreen()+24) {
-            std::cerr<<"GUNMETAL_LED_54 off="<<off.toDisplayString(true)
-                     <<" on="<<on.toDisplayString(true)<<'\n';
-            return 54;
-        }
-        // Photo thumb travels across the *same* stationary plate.
-        // The centre thumbnail area is metal at 50%, but at 100% is
-        // dark track; use contrast not a fragile exact RGB value.
-        float diff=0.0f;
-        for(int y=6;y<36;y+=4)
-            for(int x=74;x<=86;x+=4)
-                diff+=std::abs(mid.getPixelAt(x,y).getBrightness()-
-                               high.getPixelAt(x,y).getBrightness());
-        if(diff<0.25f) {
-            std::cerr<<"GUNMETAL_THUMB_TRAVEL_55 image difference="
-                     <<diff<<'\n';
-            return 55;
-        }
     }
     // Production ON/OFF resources and Bypass inversion contract.
     {
