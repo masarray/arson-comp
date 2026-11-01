@@ -22,7 +22,7 @@ private:
     std::array<FaceCache,2> faces; // normal + oversized Threshold only
     juce::Image sourceFace; // decoded once on GUI initialization
     juce::Image toggleOn, toggleOff; // matched, predecoded state sprites
-    juce::Image sliderTrack, sliderThumb; // layered photographic gunmetal assets, decoded once
+    juce::Image sliderTrack, sliderThumb, sliderThumbCompact; // native-resolution prefiltered fader cap
     const juce::Image& knobFace(int diameter,bool primary);
 };
 class Editor final : public juce::AudioProcessorEditor, private juce::Timer {

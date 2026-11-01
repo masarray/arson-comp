@@ -61,6 +61,16 @@ CompLook::CompLook() {
         BinaryData::dark_brushed_slider_thumb_png,
         static_cast<std::size_t>(BinaryData::dark_brushed_slider_thumb_pngSize));
     jassert(sliderTrack.isValid() && sliderThumb.isValid());
+    // The actual fader is 34px high: filter the tiny cap ONCE on the
+    // message thread, not as a moving photographic resample on every drag.
+    if(sliderThumb.isValid()) {
+        constexpr int targetH=arson::ui::EditorMetrics::faderHeight-4;
+        constexpr float aspect=arson::ui::FaderGeometry::thumbSourceW /
+                               arson::ui::FaderGeometry::thumbSourceH;
+        sliderThumbCompact=sliderThumb.rescaled(
+            juce::roundToInt(targetH*aspect),targetH,
+            juce::Graphics::highResamplingQuality);
+    }
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colour{0xff31383e});
@@ -253,16 +263,23 @@ void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
         g.setColour(juce::Colour{0xffffb0b6}.withAlpha(0.46f));
         g.fillRect(left,cy-0.55f,position-left,1.1f);
     }
-    // Single original graphite brushed-metal asset with bevel/grip built in.
-    // No overlaid silver lines or faux bezel; the PNG is drawn only once.
-    if(sliderThumb.isValid()) {
+    // Tactile graphite cap: dark metal undercut + actual brushed-metal PNG.
+    // This is not the old painted-on bright silver ridge. Keep the silhouette
+    // readable at the real 14x30px GUI size, even on a dark empty rail.
+    g.setColour(juce::Colour{0xff4a545a});
+    g.fillRoundedRectangle(thumb,3.0f);
+    g.setColour(juce::Colour{0xff161c20});
+    g.fillRoundedRectangle(thumb.reduced(1.15f,0.8f),2.3f);
+    if(sliderThumbCompact.isValid() &&
+       std::abs(thumb.getWidth()-sliderThumbCompact.getWidth())<0.65f &&
+       std::abs(thumb.getHeight()-sliderThumbCompact.getHeight())<0.65f) {
+        // Pre-filter once; draw at integer device pixels without extra
+        // downsampling that previously erased the small metal edge.
+        g.drawImageAt(sliderThumbCompact,juce::roundToInt(thumb.getX()),
+                      juce::roundToInt(thumb.getY()));
+    } else if(sliderThumb.isValid()) {
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
         g.drawImage(sliderThumb,thumb);
-    } else {
-        g.setColour(juce::Colour{0xff24292c});
-        g.fillRoundedRectangle(thumb,3.0f);
-        g.setColour(juce::Colour{0xff5e6568});
-        g.drawRoundedRectangle(thumb.reduced(0.5f),2.5f,1.0f);
     }
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,

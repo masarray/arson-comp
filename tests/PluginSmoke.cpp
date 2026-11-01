@@ -246,6 +246,25 @@ static int runSmoke(int argc,char** argv) {
         if(bevel.getBrightness()<0.30f ||
            bevel.getBrightness()-graphite.getBrightness()<0.14f ||
            bevel.getFloatAlpha()<0.90f) return 86;
+        // Exercise the actual JUCE LookAndFeel fader render, not only the
+        // asset's existence. A nearly invisible cap passed earlier tests.
+        // The real 34px-tall strip must expose a visible metal edge.
+        {
+            CompLook look;
+            juce::Image paintTest(juce::Image::ARGB,100,34,true);
+            juce::Graphics faderGraphics(paintTest);
+            faderGraphics.fillAll(juce::Colour{0xff262c31});
+            juce::Slider dummy;
+            const auto geom=arson::ui::FaderGeometry::calculate(100.0f,34.0f,55.0f);
+            look.drawLinearSlider(faderGraphics,0,0,100,34,55.0f,0.0f,100.0f,
+                                  juce::Slider::LinearHorizontal,dummy);
+            const int sampleX=juce::roundToInt(geom.position)-3;
+            const auto polishedEdge=paintTest.getPixelAt(sampleX,12);
+            const auto chassis=paintTest.getPixelAt(sampleX-17,12);
+            if(polishedEdge.getBrightness()<0.27f ||
+               polishedEdge.getBrightness()-chassis.getBrightness()<0.08f)
+                return 87;
+        }
         // Verify the complete rotary red arc (not only its metal JPEG face)
         // fits inside the enlarged knob hit rectangle, including stroke.
         for(int width : {62,66,72,78,100})
