@@ -6,12 +6,16 @@
   <meta name="theme-color" content="#0b0d12">
   <meta name="color-scheme" content="dark">
   <meta name="description" content="ArSonComp is a lightweight realtime compressor for vocals, music and live audio. Download VST3 and Standalone for Windows, macOS and Linux.">
+  <link rel="canonical" href="https://masarray.github.io/arson-comp/">
+  <meta property="og:url" content="https://masarray.github.io/arson-comp/">
+  <meta property="og:site_name" content="ArSonComp">
   <meta property="og:type" content="website">
   <meta property="og:title" content="ArSonComp — Compression that stays in the flow">
   <meta property="og:description" content="A focused, low-latency compressor. Download for Windows, macOS and Linux.">
   <meta property="og:image" content="https://masarray.github.io/arson-comp/assets/arsoncomp-full.png">
   <meta property="og:image:alt" content="Actual ArSonComp compressor GUI with dynamics graph and precision controls">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://masarray.github.io/arson-comp/assets/arsoncomp-full.png">
   <meta name="robots" content="index,follow">
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -154,6 +158,34 @@
       </div>
     </section>
 
+    <section class="section section-faq" id="faq" aria-labelledby="faq-heading">
+      <div class="shell faq-layout">
+        <div>
+          <span class="section-kicker">05 / GOOD TO KNOW</span>
+          <h2 id="faq-heading">A few things<br><span>before you begin.</span></h2>
+          <p class="faq-intro">Practical answers about installation, compatibility, and the current release.</p>
+        </div>
+        <div class="faq-items">
+          <details>
+            <summary>My DAW doesn't show ArSonComp after installing. <span aria-hidden="true">+</span></summary>
+            <p>Restart your DAW and rescan VST3 plug-ins. On Windows, check whether it is installed for the current user or all users; remove older duplicate copies if the host loads one first. See the <a href="https://github.com/masarray/arson-comp/blob/main/docs/INSTALL-PUBLIC.md">installation guide</a>.</p>
+          </details>
+          <details>
+            <summary>Which Linux installer should I choose? <span aria-hidden="true">+</span></summary>
+            <p>Use the DEB installer for compatible Ubuntu/Debian x86_64 systems. For other modern glibc-based x86_64 distributions, use the portable archive and its per-user install script. Other CPU architectures are not included in this release.</p>
+          </details>
+          <details>
+            <summary>Why does macOS show a security warning? <span aria-hidden="true">+</span></summary>
+            <p>The universal application and VST3 are ad-hoc signed, but the installer is not Apple notarized. Download only from the official GitHub Release and follow Apple's application approval flow if you trust the file. Do not disable Gatekeeper globally.</p>
+          </details>
+          <details>
+            <summary>Is this version production-stable? <span aria-hidden="true">+</span></summary>
+            <p>v0.2.0-rc.1 is a public Release Candidate. Automated Windows, Linux, and macOS builds passed. Real hardware dropout tests, independent DAW certification, licensing review, and macOS notarization remain separate release gates. See the <a href="https://github.com/masarray/arson-comp/blob/main/docs/RELEASE-STATUS.md">release status</a>.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
     <section class="closing-section">
       <div class="shell closing-inner">
         <span class="section-kicker">MADE TO MOVE WITH YOU</span>
@@ -166,7 +198,7 @@
   <footer class="site-footer">
     <div class="shell footer-inner">
       <div><a class="brand footer-brand" href="#top"><span class="brand-word">ArSon<span>Comp</span></span></a><p>Precision dynamics for real-world audio.</p></div>
-      <div class="footer-links"><a href="https://github.com/masarray/arson-comp">GitHub</a><a href="https://github.com/masarray/arson-comp/releases">Releases</a><a href="https://github.com/masarray/arson-comp/issues">Support</a><a href="https://github.com/masarray/arson-comp/blob/main/LICENSE">AGPL-3.0</a></div>
+      <div class="footer-links"><a href="https://github.com/masarray/arson-comp">GitHub</a><a href="https://github.com/masarray/arson-comp/releases">Releases</a><a href="https://github.com/masarray/arson-comp/issues">Support</a><a href="https://github.com/masarray/arson-comp/blob/main/LICENSE">AGPL-3.0</a><a href="./privacy.html">Privacy</a></div>
       <div class="footer-legal">© 2026 ArSon Audio. No sonic parity or physical zero-xrun certification implied.</div>
     </div>
   </footer>

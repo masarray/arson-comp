@@ -108,6 +108,27 @@ def check() -> None:
             raise AssertionError("screenshot was modified: " + filename)
         print(f"Verified genuine image: {filename} {w}x{h}")
 
+    # Production SEO and website privacy must be internally consistent.
+    import xml.etree.ElementTree as ET
+    canonical = "https://masarray.github.io/arson-comp/"
+    assert '<link rel="canonical" href="' + canonical + '">' in text, "canonical URL missing"
+    assert '<meta property="og:url" content="' + canonical + '">' in text, "OpenGraph origin drift"
+    assert '<meta name="twitter:image"' in text, "social preview missing"
+    assert 'href="./privacy.html"' in text and 'id="faq"' in text, "support/FAQ links missing"
+    policy = ROOT / "privacy.html"
+    assert policy.is_file(), "privacy statement missing"
+    assert (ROOT / "styles.css").is_file()
+    policy_page = Page()
+    policy_page.feed(policy.read_text(encoding="utf-8"))
+    assert policy_page.has_title, "privacy page missing title"
+    assert 'does not embed advertising trackers' in policy.read_text(encoding="utf-8")
+    sitemap = ROOT / "sitemap.xml"
+    sitemap_root = ET.parse(sitemap).getroot()
+    locations = {e.text for e in sitemap_root.iter() if e.tag.endswith("loc")}
+    assert locations == {canonical, canonical + "privacy.html"}, "sitemap URL drift"
+    robots = (ROOT / "robots.txt").read_text(encoding="utf-8")
+    assert "Sitemap: " + canonical + "sitemap.xml" in robots, "robots/sitemap mismatch"
+
     assert not (ROOT / "CNAME").exists(), "unknown domain must not be guessed"
     assert (ROOT / "_headers").is_file(), "missing Cloudflare security headers"
     assert (ROOT / ".nojekyll").exists(), "missing GitHub Pages .nojekyll"

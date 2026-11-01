@@ -14,10 +14,12 @@ It uses **real original M7 JUCE screenshots**, copied by their Git blob SHA from
 ## Cloudflare Pages — preferred primary site
 1. Cloudflare dashboard → Workers & Pages → Create → **Pages** → Connect to Git.
 2. Select GitHub masarray/arson-comp and set **production branch = main**.
-3. Framework preset = **None**; Build command = **exit 0**; Build output directory = **site**; Root directory = repository root.
+3. Framework preset = **None**; Build command = **leave blank (no build)**; Build output directory = **site**; Root directory = repository root.
 4. Deploy. A *.pages.dev preview/production URL is created; connect your own domain under Pages → Custom domains when the domain is chosen.
 5. Cloudflare automatically previews PR branches and redeploys main after merges.
 6. site/_headers ships security/cache headers for Cloudflare Pages. GitHub Pages ignores _headers; both hosts still use the same static assets.
+
+Search indexing and social cards currently use the public GitHub Pages URL as the canonical origin. **When a verified Cloudflare custom domain becomes the primary public URL**, update the canonical and OpenGraph URLs in `site/index.html`, `site/privacy.html`, `site/sitemap.xml`, and `site/robots.txt` together, then verify both hosts. Do not guess a domain or configure redirects before the owner selects it.
 
 Do not add a guessed CNAME or domain. Cloudflare Pages project/domain connection requires the user's Cloudflare account authorization and DNS control. The Git repository is ready, but it is not evidence that a Cloudflare deployment has been performed.
 
