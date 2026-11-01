@@ -1,5 +1,7 @@
 # ArSonComp
 
+**[Official download website](https://masarray.github.io/arson-comp/)** · [Windows / macOS / Linux installers](https://masarray.github.io/arson-comp/#downloads) · [Source and releases](https://github.com/masarray/arson-comp/releases)
+
 **Real-time dynamics for vocals, music, podcasts, streaming, and live mixing.**
 
 [![Cross-platform packages](https://github.com/masarray/arson-comp/actions/workflows/release-installers.yml/badge.svg)](https://github.com/masarray/arson-comp/actions/workflows/release-installers.yml)

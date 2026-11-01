@@ -1,0 +1,16 @@
+{
+  "name": "ArSonComp — Professional Compressor",
+  "short_name": "ArSonComp",
+  "start_url": "./",
+  "display": "browser",
+  "background_color": "#0a0c10",
+  "theme_color": "#0b0d12",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

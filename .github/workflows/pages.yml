@@ -1,0 +1,96 @@
+name: Publish download website (GitHub Pages)
+
+on:
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'docs/LANDING-PAGE-DEPLOYMENT.md'
+      - '.github/workflows/pages.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/LANDING-PAGE-DEPLOYMENT.md'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: arsoncomp-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Verify site, downloads and real screenshots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate static site links and screenshots
+        run: python3 site/scripts/validate_site.py
+      - name: Check native JavaScript syntax
+        run: node --check site/app.js
+      - name: Smoke-test static HTTP response
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory site >/tmp/arson-site-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in 1 2 3 4 5; do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:8765/; then break; fi
+            sleep 1
+          done
+          curl --fail --silent --show-error http://127.0.0.1:8765/ | grep -Fq 'Download for Windows'
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8765/assets/arsoncomp-full.png
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8765/styles.css
+          echo 'Static HTTP delivery PASS'
+      - name: Capture real desktop and mobile browser previews
+        run: |
+          set -euo pipefail
+          browser="$(command -v google-chrome || command -v chromium || true)"
+          if [[ -z "$browser" ]]; then
+            echo "Chrome not available on runner; static tests still passed"
+            exit 0
+          fi
+          mkdir -p preview
+          python3 -m http.server 8766 --bind 127.0.0.1 --directory site >/tmp/arson-preview.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          sleep 2
+          "$browser" --headless --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=9000             --screenshot=preview/desktop-1440.png --window-size=1440,5200 http://127.0.0.1:8766/ >/tmp/arson-chrome.log 2>&1
+          "$browser" --headless --no-sandbox --disable-gpu --hide-scrollbars --run-all-compositor-stages-before-draw --virtual-time-budget=9000             --screenshot=preview/mobile-390.png --window-size=390,5200 http://127.0.0.1:8766/ >>/tmp/arson-chrome.log 2>&1
+          test -s preview/desktop-1440.png
+          test -s preview/mobile-390.png
+      - name: Upload website visual QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArSonComp-M9-Landing-Preview
+          path: preview/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
+  deploy:
+    name: Deploy static website
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload site root only
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
