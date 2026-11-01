@@ -734,7 +734,14 @@ static int runSmoke(int argc,char** argv) {
             if(!range->isVisible()||hp->isVisible()||!autoMode->isVisible())
                 return 32;
         }
-        editor->addToDesktop(0); editor->setVisible(true);
+        // Under Linux/Xvfb there may be no EWMH-compatible window manager.
+        // An X_ChangeProperty BadAtom can occur before the actual GUI smoke
+        // assertions. Paint/snapshot offscreen there; keep native window
+        // peer coverage on Windows and macOS.
+       #if !JUCE_LINUX
+        editor->addToDesktop(0);
+       #endif
+        editor->setVisible(true);
         for(int j=0;j<1500;++j) {
             for(int i=0;i<128;++i) {
                 const float level=0.15f+0.6f*(0.5f+0.5f*std::sin(j*0.013f));

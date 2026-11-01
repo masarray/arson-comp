@@ -73,7 +73,7 @@ begin
     OtherPlugin := ExpandConstant('{commoncf}\VST3\ArSonComp.vst3');
   if DirExists(OtherPlugin) then
     MsgBox('Another ArSonComp VST3 also exists in:' + #13#10 + OtherPlugin +
-      #13#10#13#10 + 'Some DAWs may load that copy first. Remove the older copy.' +
-      #13#10 + 'Restart or rescan your DAW after installing.',
+      '' + #13#10#13#10 + 'Some DAWs may load that copy first. Remove the older copy.' +
+      '' + #13#10 + 'Restart or rescan your DAW after installing.',
       mbInformation, MB_OK);
 end;
