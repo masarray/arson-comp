@@ -45,6 +45,31 @@ jobs:
           curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8765/assets/arsoncomp-full.png
           curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8765/styles.css
           echo 'Static HTTP delivery PASS'
+      - name: Capture real desktop and mobile browser previews
+        run: |
+          set -euo pipefail
+          browser="$(command -v google-chrome || command -v chromium || true)"
+          if [[ -z "$browser" ]]; then
+            echo "Chrome not available on runner; static tests still passed"
+            exit 0
+          fi
+          mkdir -p preview
+          python3 -m http.server 8766 --bind 127.0.0.1 --directory site >/tmp/arson-preview.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          sleep 2
+          "$browser" --headless --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=2000             --screenshot=preview/desktop-1440.png --window-size=1440,2600 http://127.0.0.1:8766/ >/tmp/arson-chrome.log 2>&1
+          "$browser" --headless --no-sandbox --disable-gpu --hide-scrollbars --virtual-time-budget=2000             --screenshot=preview/mobile-390.png --window-size=390,2500 http://127.0.0.1:8766/ >>/tmp/arson-chrome.log 2>&1
+          test -s preview/desktop-1440.png
+          test -s preview/mobile-390.png
+      - name: Upload website visual QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArSonComp-M9-Landing-Preview
+          path: preview/*.png
+          if-no-files-found: warn
+          retention-days: 7
 
   deploy:
     name: Deploy static website
