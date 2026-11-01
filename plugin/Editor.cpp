@@ -52,6 +52,15 @@ CompLook::CompLook() {
         static_cast<std::size_t>(BinaryData::arson_toggle_off_pngSize));
     jassert(toggleOn.isValid() && toggleOff.isValid());
     jassert(toggleOn.getBounds()==toggleOff.getBounds());
+    // Independent stationary track + moving circular silver thumb.
+    // Decode only on editor construction, never in draw or the audio thread.
+    sliderTrack=juce::ImageFileFormat::loadFrom(
+        BinaryData::arsoncomp_flat_track_480_png,
+        static_cast<std::size_t>(BinaryData::arsoncomp_flat_track_480_pngSize));
+    sliderThumb=juce::ImageFileFormat::loadFrom(
+        BinaryData::arsoncomp_silver_thumb_96_png,
+        static_cast<std::size_t>(BinaryData::arsoncomp_silver_thumb_96_pngSize));
+    jassert(sliderTrack.isValid() && sliderThumb.isValid());
     setColour(juce::Slider::textBoxTextColourId,text);
     setColour(juce::Slider::textBoxBackgroundColourId,juce::Colour{0xff111417});
     setColour(juce::Slider::textBoxOutlineColourId,juce::Colour{0xff31383e});
@@ -194,71 +203,20 @@ void CompLook::drawRotarySlider(juce::Graphics& g,int x,int y,int w,int h,
 void CompLook::drawLinearSlider(juce::Graphics& g,int x,int y,int w,int h,
                                  float pos,float,float,
                                  const juce::Slider::SliderStyle,juce::Slider&) {
-    // Modern vector-only JUCE fader; no texture, sprite or image resampling.
-    // Host automation, keyboard input and gestures remain native JUCE Slider.
-    const auto geometry=arson::ui::FaderGeometry::calculate(
+    // Two approved photographic assets: the flat grey brushed-metal ruler
+    // stays stationary; only the circular satin-metal thumb moves.
+    // Preserve aspect ratio of both PNGs for a true hardware appearance.
+    const auto geom=arson::ui::FaderGeometry::calculate(
         static_cast<float>(w),static_cast<float>(h),pos);
-    const auto track=geometry.track.translated(static_cast<float>(x),
-                                               static_cast<float>(y));
-    const auto thumb=geometry.thumb.translated(static_cast<float>(x),
-                                               static_cast<float>(y));
-    const float cy=static_cast<float>(y)+static_cast<float>(h)*0.5f;
-    const float progress=juce::jlimit(0.0f,1.0f,
-        (geometry.position-geometry.left)/(geometry.right-geometry.left));
-
-    // Inset charcoal rail: restrained outline, clear separation from chassis.
-    const auto housing=track.expanded(1.4f,2.6f);
-    g.setColour(juce::Colour{0xff11171b});
-    g.fillRoundedRectangle(housing,4.2f);
-    g.setColour(juce::Colour{0xff6e777c}.withAlpha(0.43f));
-    g.drawRoundedRectangle(housing.reduced(0.35f),4.0f,0.85f);
-    g.setColour(juce::Colour{0xff070c10});
-    g.fillRoundedRectangle(track,track.getHeight()*0.5f);
-    g.setColour(juce::Colour{0xff9ba4a8}.withAlpha(0.15f));
-    g.drawHorizontalLine(juce::roundToInt(track.getY()+1.0f),
-        track.getX()+3.0f,track.getRight()-3.0f);
-
-    // Coral level fill, clipped into rounded channel. Minimum is fully dark.
-    if(progress>0.001f) {
-        juce::Graphics::ScopedSaveState clip(g);
-        juce::Path channel;
-        channel.addRoundedRectangle(track,track.getHeight()*0.5f);
-        g.reduceClipRegion(channel);
-        const float litRight=track.getX()+track.getWidth()*progress;
-        g.setGradientFill(juce::ColourGradient(
-            juce::Colour{0xfffc8587},track.getX(),track.getY(),
-            juce::Colour{0xffb33b4d},track.getX(),track.getBottom(),false));
-        g.fillRect(track.getX(),track.getY(),
-                   litRight-track.getX(),track.getHeight());
-        if(litRight>track.getX()+4.0f) {
-            g.setColour(juce::Colour{0xffffd1cf}.withAlpha(0.43f));
-            g.drawHorizontalLine(juce::roundToInt(cy-0.5f),
-                track.getX()+2.0f,litRight-1.0f);
-        }
+    const auto rail=geom.track.translated(static_cast<float>(x),
+                                          static_cast<float>(y));
+    const auto cap=geom.thumb.translated(static_cast<float>(x),
+                                         static_cast<float>(y));
+    if(sliderTrack.isValid() && sliderThumb.isValid()) {
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImage(sliderTrack,rail);
+        g.drawImage(sliderThumb,cap);
     }
-
-    // Sharp graphite thumb with soft satin bevel + small red engraved grip.
-    // At actual 34px height the thumb remains 13-15px wide and 28px tall.
-    g.setColour(juce::Colours::black.withAlpha(0.48f));
-    g.fillRoundedRectangle(thumb.translated(0.0f,1.4f),3.2f);
-    juce::ColourGradient brushed(juce::Colour{0xff869198},thumb.getX(),cy,
-                                 juce::Colour{0xff414a51},thumb.getRight(),cy,false);
-    brushed.addColour(0.19,juce::Colour{0xff707c83});
-    brushed.addColour(0.40,juce::Colour{0xff333c43});
-    brushed.addColour(0.73,juce::Colour{0xff222b31});
-    g.setGradientFill(brushed);
-    g.fillRoundedRectangle(thumb,3.1f);
-    g.setColour(juce::Colour{0xffa3adb2}.withAlpha(0.62f));
-    g.drawRoundedRectangle(thumb.reduced(0.7f),2.6f,0.85f);
-    g.setColour(juce::Colours::white.withAlpha(0.10f));
-    g.drawVerticalLine(juce::roundToInt(thumb.getX()+2.1f),
-        thumb.getY()+4.0f,thumb.getBottom()-4.0f);
-    const juce::Rectangle<float> grip{
-        thumb.getX()+3.1f,cy-1.2f,thumb.getWidth()-6.2f,2.4f};
-    g.setColour(juce::Colour{0xff141a1f});
-    g.fillRoundedRectangle(grip.expanded(0.4f,0.65f),1.25f);
-    g.setColour(juce::Colour{0xffed7279});
-    g.fillRoundedRectangle(grip,1.2f);
 }
 void CompLook::drawToggleButton(juce::Graphics& g,juce::ToggleButton& button,
                                  bool highlighted,bool down) {
