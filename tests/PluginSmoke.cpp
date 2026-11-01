@@ -209,74 +209,41 @@ static int runSmoke(int argc,char** argv) {
         if(std::abs(audio.getSample(0,0)-0.123f)>1.0e-6f ||
            std::abs(audio.getSample(0,31)-0.123f)>1.0e-6f)return failHost(46);
     }
-    // Hardware fader layer contract: independent transparent photo plate
-    // (stationary), dark brushed graphite thumb and moving red LED level.
-    // Confirm real JUCE BinaryData resources, not external installation paths.
+    // Fully vector JUCE Graphics faders; raster and geometric regression.
     {
-        const auto plate=juce::ImageFileFormat::loadFrom(
-            BinaryData::gunmetal_slider_track_png,
-            static_cast<std::size_t>(BinaryData::gunmetal_slider_track_pngSize));
-        const auto thumb=juce::ImageFileFormat::loadFrom(
-            BinaryData::dark_brushed_slider_thumb_png,
-            static_cast<std::size_t>(BinaryData::dark_brushed_slider_thumb_pngSize));
-        if(!plate.isValid() || plate.getWidth()!=340 || plate.getHeight()!=57 ||
-           !thumb.isValid() || thumb.getWidth()!=58 || thumb.getHeight()!=124 ||
-           plate.getPixelAt(0,0).getFloatAlpha()>0.04f ||
-           thumb.getPixelAt(0,0).getFloatAlpha()>0.04f ||
-           plate.getPixelAt(170,29).getFloatAlpha()<0.92f ||
-           thumb.getPixelAt(29,62).getFloatAlpha()<0.92f) {
-            std::cerr<<"GUNMETAL_RESOURCE_47 track="<<plate.getWidth()
-                     <<"x"<<plate.getHeight()<<" thumb="<<thumb.getWidth()
-                     <<"x"<<thumb.getHeight()<<" cornerAlpha="
-                     <<thumb.getPixelAt(0,0).getFloatAlpha()<<" centreAlpha="
-                     <<thumb.getPixelAt(29,62).getFloatAlpha()<<'\n';
-            return 47;
-        }
-
-        // Original dark graphite asset must not regress to a bright silver
-        // placeholder, and its real PNG corner alpha must remain transparent.
-        const auto graphite=thumb.getPixelAt(22,40);
-        if(graphite.getRed()>=85 || graphite.getGreen()>=90 ||
-           graphite.getBlue()>=95 || graphite.getFloatAlpha()<0.80f)
-            return 82;
-        // The v1 dark thumb was technically valid but almost invisible at
-        // the 14px actual fader width. Require a polished edge inside the
-        // PNG itself, not a second silver overlay painted by the renderer.
-        const auto bevel=thumb.getPixelAt(15,40);
-        if(bevel.getBrightness()<0.30f ||
-           bevel.getBrightness()-graphite.getBrightness()<0.14f ||
-           bevel.getFloatAlpha()<0.90f) return 86;
-        // Exercise the actual JUCE LookAndFeel fader render, not only the
-        // asset's existence. A nearly invisible cap passed earlier tests.
-        // The real 34px-tall strip must expose a visible metal edge.
+        for(float width : {70.0f,90.0f,105.0f,150.0f})
+            for(float height : {34.0f,36.0f,40.0f})
+                for(float pos : {-100.0f,width*0.5f,width+100.0f}) {
+                    const auto shape=arson::ui::FaderGeometry::calculate(
+                        width,height,pos);
+                    if(shape.track.getHeight()!=arson::ui::FaderGeometry::railHeight ||
+                       shape.track.getX()<0||shape.track.getRight()>width ||
+                       shape.thumb.getX()<0||shape.thumb.getRight()>width ||
+                       shape.thumb.getY()<0||shape.thumb.getBottom()>height ||
+                       shape.thumb.getWidth()<12.0f||shape.thumb.getHeight()<22.0f ||
+                       shape.right<=shape.left)return 73;
+                }
         {
             CompLook look;
-            juce::Image paintTest(juce::Image::ARGB,100,34,true);
-            // End the Graphics lifetime before inspecting pixels. JUCE image
-            // backends may defer drawing while the graphics context is live;
-            // reading at that point returned transparent black on Windows.
+            juce::Image raster(juce::Image::ARGB,100,34,true);
             {
-                juce::Graphics faderGraphics(paintTest);
-                faderGraphics.fillAll(juce::Colour{0xff262c31});
+                juce::Graphics g(raster);
+                g.fillAll(juce::Colour{0xff262c31});
                 juce::Slider dummy;
-                look.drawLinearSlider(faderGraphics,0,0,100,34,55.0f,0.0f,100.0f,
+                look.drawLinearSlider(g,0,0,100,34,55.0f,0.0f,100.0f,
                                       juce::Slider::LinearHorizontal,dummy);
             }
-            const auto geom=arson::ui::FaderGeometry::calculate(100.0f,34.0f,55.0f);
-            const int sampleX=juce::roundToInt(geom.position)-4;
-            const auto polishedEdge=paintTest.getPixelAt(sampleX,12);
-            const auto chassis=paintTest.getPixelAt(sampleX-17,12);
-            const float capBrightness=polishedEdge.getBrightness();
-            const float chassisBrightness=chassis.getBrightness();
-            if(capBrightness<0.24f || capBrightness-chassisBrightness<0.04f) {
-                std::cerr<<"FADER_CAP_CONTRAST_87 cap="<<capBrightness
-                         <<" chassis="<<chassisBrightness
-                         <<" x="<<sampleX<<'\n';
+            const auto shape=arson::ui::FaderGeometry::calculate(100.0f,34.0f,55.0f);
+            const int px=juce::roundToInt(shape.thumb.getX()+2.0f);
+            const int py=juce::roundToInt(shape.thumb.getY()+5.0f);
+            const float cap=raster.getPixelAt(px,py).getBrightness();
+            const float backdrop=raster.getPixelAt(2,py).getBrightness();
+            if(cap<0.22f || cap-backdrop<0.06f) {
+                std::cerr<<"VECTOR_CAP_CONTRAST_87 cap="<<cap
+                         <<" backdrop="<<backdrop<<std::endl;
                 return 87;
             }
         }
-        // Verify the complete rotary red arc (not only its metal JPEG face)
-        // fits inside the enlarged knob hit rectangle, including stroke.
         for(int width : {62,66,72,78,100})
             for(bool threshold : {false,true}) {
                 const int diameter=arson::ui::KnobGeometry::facePixels(
@@ -284,21 +251,8 @@ static int runSmoke(int argc,char** argv) {
                 if(arson::ui::KnobGeometry::outerPaintRadius(diameter)
                     +arson::ui::KnobGeometry::safeInset >
                     0.5f*std::min(width,arson::ui::EditorMetrics::knobHeight)
-                    +0.01f) return 83;
+                    +0.01f)return 83;
             }
-        // Maintain native track/thumb aspect ratio at every window width.
-        for(float width : {70.0f,90.0f,105.0f,150.0f}) {
-            for(float height : {34.0f,40.0f}) {
-                const auto shape=arson::ui::FaderGeometry::calculate(width,height,width*0.5f);
-                if(std::abs(shape.track.getWidth()/shape.track.getHeight()-340.0f/57.0f)>0.001f ||
-                   std::abs(shape.thumb.getWidth()/shape.thumb.getHeight()-58.0f/124.0f)>0.001f ||
-                   shape.track.getX()<0 || shape.track.getRight()>width ||
-                   shape.thumb.getY()<0 || shape.thumb.getBottom()>height ||
-                   shape.left>=shape.right) {
-                    std::cerr<<"FADER_ASPECT_RATIO_73 w="<<width<<"\n";return 73;
-                }
-            }
-        }
         // Raster-render all three slider positions via the *production*
         // LookAndFeel, then inspect the LED at a track location untouched
         // by the thumb. Red must be off at minimum and lit at maximum.
@@ -318,10 +272,8 @@ static int runSmoke(int argc,char** argv) {
         const auto low=render(21.0f);
         const auto mid=render(80.0f);
         const auto high=render(139.0f);
-        // The scaled 6:1 track needs a separate visible metal bezel,
-        // otherwise short Dynamics controls look like flat red hairlines.
-        // Sample above the PNG track, inside the 23px bezel.
-        const auto housingPixel=low.getPixelAt(61,10);
+        // Inset vector channel should be darker than chassis at centre.
+        const auto housingPixel=low.getPixelAt(61,17);
         const auto backdrop=juce::Colour{0xff44494d};
         if(housingPixel.getBrightness()>=backdrop.getBrightness()-0.045f) {
             std::cerr<<"FADER_HOUSING_DEPTH_78 pixel="
@@ -588,9 +540,9 @@ static int runSmoke(int argc,char** argv) {
             return 68;
         if(!editor->findChildWithID("preset.save") || !editor->findChildWithID("preset.load"))
             return 18;
-        editor->setSize(iteration%2 ? 580 : 612,iteration%2 ? 480 : 500);
+        editor->setSize(iteration%2 ? 580 : 612,iteration%2 ? arson::ui::EditorMetrics::minHeight : arson::ui::EditorMetrics::defaultHeight);
         if(editor->getWidth()!=(iteration%2 ? 580 : 612) ||
-           editor->getHeight()!=(iteration%2 ? 480 : 500))return 9;
+           editor->getHeight()!=(iteration%2 ? arson::ui::EditorMetrics::minHeight : arson::ui::EditorMetrics::defaultHeight))return 9;
         auto* threshold=editor->findChildWithID("param.threshold");
         auto* input=editor->findChildWithID("param.input");
         auto* ratio=editor->findChildWithID("param.ratio");
@@ -611,6 +563,10 @@ static int runSmoke(int argc,char** argv) {
             editor->getHeight()-arson::ui::EditorMetrics::displayBottomReserve};
         if(!canvas || !canvas->isVisible() || !canvas->isOpaque() ||
            canvas->getBounds()!=expectedCanvas)return 70;
+        // LCD must remain spacious at minimum and default window dimensions.
+        if(canvas->getHeight()<280 ||
+           static_cast<float>(canvas->getHeight())/canvas->getWidth()<0.47f)
+            return 88;
         auto* readout=dynamic_cast<juce::Label*>(
             editor->findChildWithID("view.value.readout"));
         if(!readout || !readout->isVisible() ||
@@ -867,7 +823,7 @@ static int runSmoke(int argc,char** argv) {
                 if(!stream || !juce::PNGImageFormat{}.writeImageToStream(compactImage,*stream))return 13;
             }
             mini->onClick();
-            if(editor->getHeight()!=500)return 14;
+            if(editor->getHeight()!=arson::ui::EditorMetrics::defaultHeight)return 14;
             if(canvas->getBounds()!=juce::Rectangle<int>{8,
                 arson::ui::EditorMetrics::displayTop,editor->getWidth()-16,
                 editor->getHeight()-arson::ui::EditorMetrics::displayBottomReserve})return 72;
